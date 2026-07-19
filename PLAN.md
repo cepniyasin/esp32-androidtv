@@ -1,0 +1,231 @@
+# Implementation Plan: Android TV Remote (protocol v2) on ESP32
+
+**Audience:** an autonomous coding agent (Claude Code or similar).
+**Goal:** Build firmware for an ESP32 that acts as a WiFi bridge to a Chromecast with Google TV / Google TV Streamer by re-implementing the **Android TV Remote protocol v2** — the same protocol used by the Google TV app and the `androidtvremote2` Python library. The ESP32 also serves a small, modern-looking web app over plain HTTP on the local network; any device on the same LAN (phone, laptop, tablet) opens it in a browser and uses it as the remote control. There are no physical buttons and no serial-based setup — the web UI is the only control surface, including pairing-code entry.
+
+---
+
+## 0. Status & decisions log (living section — keep current)
+
+**Last updated:** 2026-07-19
+
+**Current phase:** Phase 0 (scaffolding) — done pending final build verification and on-device WiFi test.
+
+Decisions made during implementation (these refine, not contradict, the plan below):
+
+- **Board:** DOIT ESP32 DevKit v1 (`board = esp32doit-devkit-v1`, WROOM-32, 4 MB flash, no PSRAM). Partition table: custom `partitions.csv` (no OTA, 3 MB factory app, NVS); `sdkconfig.defaults` sets 4 MB flash.
+- **PlatformIO layout:** `src_dir = main` in `platformio.ini` so the ESP-IDF-style `main/` component satisfies PlatformIO's source-dir expectation; `components/` is picked up by IDF's own project.cmake.
+- **nanopb codegen:** generated `.pb.c/.pb.h` are committed under `main/proto_gen/` and regenerated on demand with `tools/gen_proto.sh` (generator `nanopb==0.4.9.1`, matching the vendored runtime in `components/nanopb/`) — rather than running codegen inside the CMake build, which would make every build depend on the generator's Python environment.
+- **Sizing:** message string/array bounds live in `proto/*.options`. Voice (`RemoteVoicePayload.samples`) and `RemoteError.message` are nanopb callbacks and out of scope on ESP32.
+- **Reference reading done:** `pairing.py`/`remote.py`/`base.py` and both protos read end-to-end; verified protocol facts are recorded in `CLAUDE.md` (§Protocol ground truth) — treat that section as the distilled version of §2/§7 checks.
+- **Host toolchain quirk (Arch, Python 3.14):** the espressif32 builder pins `pydantic<2.12`, whose `pydantic-core` has no CPython 3.14 wheels and fails to build from source. Workaround in place: 3.14-compatible deps (incl. `pydantic>=2.12`) installed manually into `~/.platformio/penv/.espidf-5.5.3/`, and `~/.platformio/packages/framework-espidf/.pio_skip_pypackages` created so the builder doesn't touch them. If the framework package is ever reinstalled, redo both steps.
+- WiFi credentials via menuconfig (`ATV_WIFI_SSID`/`ATV_WIFI_PASSWORD`) for now; NVS-stored creds remain an option for later phases.
+
+---
+
+## 1. What we are actually building
+
+The reference implementation is the Python library `tronikos/androidtvremote2`. We are porting its behavior to C/C++ on an ESP32. The protocol has two phases, each a separate TLS connection:
+
+| Phase | Port | Purpose | Frequency |
+|-------|------|---------|-----------|
+| Pairing | 6467 | One-time trust setup; TV shows a code, we prove we know it | Once per device |
+| Remote (control) | 6466 | Send key presses, text, app launches; respond to keepalive pings | Every session |
+
+A third, unrelated surface: the ESP32 runs a plain HTTP server on port 80 for the on-LAN web UI. This is not part of the Android TV protocol — it's how a phone/laptop browser talks to the ESP32, which then relays commands over the two TLS connections above. No TLS/auth is added on this local side; it's trusted-LAN-only, same trust model as most home IoT admin pages.
+
+Both TV-facing connections are **mutual TLS**: the ESP32 must present a **self-signed client certificate**. The TV presents its own self-signed cert (we do not verify it against a CA — we skip server verification but still do client auth). Messages on both channels are **length-delimited Protocol Buffers** (a varint length prefix, then the serialized message).
+
+After a successful pairing, the ESP32's client certificate is remembered by the TV as trusted, so future control sessions skip pairing entirely.
+
+---
+
+## 2. Non-negotiable ground truth (read the source, don't trust memory)
+
+The exact protobuf field numbers, message names, and — critically — the pairing secret algorithm must be taken **verbatim** from the reference implementation. Do not reconstruct these from this document's prose; this document gives the shape, the source gives the bytes.
+
+Authoritative references:
+
+- **`tronikos/androidtvremote2`** — https://github.com/tronikos/androidtvremote2
+  - `.proto` files (message definitions) — e.g. `src/androidtvremote2/remotemessage.proto` and the pairing proto in the same directory. These are the schema you will feed to nanopb.
+  - `pairingmessage`/`remotemessage` proto + the Python `pairing` and `remote` modules — port their state machines and, above all, the **secret computation** faithfully.
+  - `TvKeys.txt` — https://github.com/tronikos/androidtvremote2/blob/main/TvKeys.txt — the keycode name→number map for `RemoteKeyInject`.
+  - `demo.py` — end-to-end usage example showing the call order.
+  - The README "Credits" section links the **v2 protocol description** and a **Node.js v2 implementation** — use both to cross-check the pairing hash and message ordering.
+
+Instruction to the agent: **before writing any C, fetch these files and read `pairing`/`remote` end to end.** If a field number in this plan disagrees with the `.proto`, the `.proto` wins.
+
+---
+
+## 3. Hardware & software stack
+
+**Hardware:** ESP32 (WROOM-32 or better; PSRAM helpful but not required). *Not* ESP8266 — RAM is too tight for RSA-2048 mutual TLS. Buttons wired to GPIO (direct pins for a handful, or a matrix for a full remote).
+
+**Build tool:** **PlatformIO**, with `platform = espressif32` and `framework = espidf` in `platformio.ini`. We keep the ESP-IDF framework itself (not Arduino) — reasoning unchanged: we need direct mbedTLS access to (a) do client-cert TLS, (b) read the peer certificate from the live session, and (c) extract RSA modulus/exponent for the pairing hash, plus `esp_http_server` for the web UI. PlatformIO just replaces `idf.py`/raw CMake as the build/upload/monitor tool; the project still uses the standard ESP-IDF component model underneath (a root `CMakeLists.txt` with `EXTRA_COMPONENT_DIRS` for any vendored components like nanopb).
+
+**Components:**
+- **mbedTLS** (bundled) — TLS transport, SHA-256, X.509 cert parsing, RSA modulus/exponent export.
+- **nanopb** — lightweight protobuf codegen for embedded C. Generate `.pb.c/.pb.h` from the reference `.proto` files.
+- **esp_http_server** (bundled) — serves the web UI and its JSON endpoints on port 80.
+- **NVS** — persist the client key/cert and "paired" flag.
+- **mDNS** (bundled component) — discover the TV via `_androidtvremote2._tcp` instead of hardcoding its IP, and advertise the ESP32 itself (e.g. `androidtv-remote.local`) so users don't need to hunt for its DHCP-assigned address.
+
+---
+
+## 4. Risk register — where this project usually fails
+
+Front-load these. If phases 1 and 3 work, the rest is routine.
+
+1. **Mutual TLS with a self-signed client cert on ESP32.** The handshake must present client cert + key and skip server verification. Getting mbedTLS configured for client auth without a CA chain is the first real hurdle.
+2. **The pairing secret hash.** This is the single most common failure point. It is a SHA-256 over concatenated RSA key material plus a nonce, and it breaks on subtle byte-ordering / leading-zero issues (see §7). Budget real time here and unit-test it in isolation.
+3. **Length-delimited protobuf framing.** Reads must handle partial TCP reads: parse the varint length, then accumulate exactly that many bytes before decoding. Off-by-one or varint bugs here cause silent desync.
+4. **Keepalive.** On the control channel the TV sends periodic ping messages; failing to answer them promptly drops the connection. The main loop must service pings.
+5. **Concurrency between the web server and the TV connection.** `esp_http_server` handles each HTTP request in its own context, but only one task may write to the TLS control socket at a time. Route every web-triggered command (key press, pairing code submit) through a single FreeRTOS queue consumed by one "TV session" task, rather than writing to the socket directly from an HTTP handler.
+
+---
+
+## 5. De-risking strategy (do this first — it saves the project)
+
+Before touching the ESP32, stand up the Python library on a PC on the same LAN:
+
+1. `pip install androidtvremote2`, run its demo against the real TV, and confirm the TV pairs and responds. This proves the device, network, and your understanding of the flow independent of embedded bugs.
+2. **Capture the wire bytes.** Run the Python pairing + a few key presses through Wireshark (or add byte-logging to the library) to get a golden reference of exactly what goes over ports 6467/6466. The ESP32 output should match this byte-for-byte at the protobuf layer.
+3. **Build a hash oracle.** Write a tiny Python script that, given fixed client cert, server cert, and code, prints the intermediate values and final secret from the library's own routine. The ESP32's secret computation (§7) must reproduce these exact bytes in a unit test. Do not proceed past pairing until this matches.
+
+This turns the two hardest subsystems (framing and the hash) into test-against-a-known-answer problems instead of guesswork.
+
+---
+
+## 6. Phased plan (each phase has a deliverable + acceptance test)
+
+### Phase 0 — Scaffolding
+- PlatformIO project (`platformio.ini`, `framework = espidf`); WiFi connect from config (SSID/pass in NVS or `menuconfig` via `pio run -t menuconfig`).
+- Add nanopb as a vendored ESP-IDF component; wire the proto→C codegen into the build.
+- Serial logging (kept for debug output only — not used for any user-facing input).
+- **Accept:** `pio run -t upload` builds and flashes clean with a dummy generated `.pb.h` included; device joins WiFi and prints its IP over serial.
+
+### Phase 1 — Mutual TLS to the pairing port (highest-risk infra)
+- Pre-generate an RSA-2048 key + self-signed client cert **on a PC with openssl** and embed both as PEM in firmware (simplest; avoids slow on-device keygen). On-device keygen is a later option if desired.
+- Open a TLS connection to `TV_IP:6467` presenting the client cert/key, with server verification disabled.
+- **Accept:** TLS handshake completes; you can read the TV's peer certificate from the session (log its subject). This alone proves the hardest transport piece.
+
+### Phase 2 — Protobuf framing
+- Implement length-delimited read/write: write = varint(len) ++ bytes; read = parse varint, accumulate `len` bytes across partial reads, decode with nanopb.
+- Unit-test the framing against captured bytes from §5.
+- **Accept:** round-trip encode/decode of a known message matches the golden capture.
+
+### Phase 3 — Local web server bring-up
+- Start `esp_http_server` on port 80 once WiFi is connected; advertise the ESP32 over mDNS (e.g. `androidtv-remote.local`) so a browser can find it without reading the DHCP lease.
+- Serve a single embedded static page (`web/index.html`, inlined CSS/JS, embedded into the binary via `board_build.embed_files`) plus a `GET /api/status` JSON endpoint (`{paired, connected}`) backed by state in NVS/RAM.
+- No dynamic behavior yet — this phase just proves static asset serving and the status endpoint work from a browser on another device on the LAN.
+- **Accept:** from a phone/laptop on the same WiFi, `http://androidtv-remote.local/` loads the page and `/api/status` returns valid JSON.
+
+### Phase 4 — Pairing state machine + secret (highest-risk logic)
+- Implement the message exchange in the order the reference does: PairingRequest → Ack, PairingOption → Ack, PairingConfiguration → Ack, (TV displays code) → **user enters code** → compute secret → PairingSecret → Ack.
+- **Code entry:** the web page shows a "pairing code" form once pairing starts; `POST /api/pair {code: "123456"}` delivers it to the TV-session task via the queue from the risk register (§4.5). The HTTP handler returns success/failure; the page reflects it without a reload.
+- Compute the secret per §7; on success persist the client cert as trusted (set a "paired" flag in NVS).
+- **Accept:** open the web page, submit the code shown on the TV, receive the final Ack, TV considers the ESP32 paired. Verify the secret matches the Python oracle in a unit test *before* live testing.
+
+### Phase 5 — Control channel + keepalive
+- Connect TLS to `TV_IP:6466` with the same cert.
+- Perform the RemoteConfigure exchange and RemoteSetActive per the reference.
+- Implement the ping/pong keepalive in the main loop.
+- Reflect connection state in `/api/status` so the web UI can show "connected"/"reconnecting".
+- **Accept:** session stays connected for >5 minutes with no key input (proves keepalive works), and `/api/status` shows it.
+
+### Phase 6 — Key injection
+- Implement `RemoteKeyInject` using keycodes from `TvKeys.txt` (DPAD_UP/DOWN/LEFT/RIGHT/CENTER, BACK, HOME, plus power/volume as available). Send the key event as the reference does (press/short-press semantics).
+- Expose it as `POST /api/key {key: "DPAD_UP"}`, queued to the same TV-session task as pairing submissions.
+- Trigger via a couple of plain buttons in the web page first (no styling needed yet).
+- **Accept:** tapping a button in the browser visibly moves the TV UI. Add text entry (`RemoteImeKeyInject` / batch edit) and app launch (`RemoteAppLinkLaunchRequest`) as bonus endpoints.
+
+### Phase 7 — Web UI polish
+- Build out the real remote layout in `web/index.html`: d-pad, OK/back/home, volume, power, modern styling (works well on a phone screen — this is the primary device it'll be used from).
+- Wire every visible control to its `/api/key` call; show live connection state from `/api/status` (e.g. poll every few seconds, or upgrade to a WebSocket push if polling feels laggy).
+- **Accept:** a phone browser on the LAN can fully drive the TV — navigation, volume, power — with a UI that looks intentional, not a debug page.
+
+### Phase 8 — Robustness & UX
+- Auto-reconnect the control channel on drop (with backoff); re-run pairing only if NVS shows unpaired.
+- Handle multiple browser tabs/devices hitting the web server concurrently (they're just stateless callers into the same queue — no per-client session needed).
+- Watchdog-safe main loop; handle WiFi drop (web server and mDNS should recover once WiFi reconnects).
+- **Accept:** unplug/replug and network blips recover automatically without re-pairing; a second device's browser can open the page mid-session and control the TV immediately.
+
+---
+
+## 7. Detail: the pairing secret (get this exactly right)
+
+Structure (verify every detail against the reference `pairing` code — this is the shape, not the license to guess):
+
+1. After the TLS handshake on 6467, obtain **both** certificates:
+   - The ESP32's **own** client cert (parse the embedded PEM).
+   - The **server** cert from the live session (`mbedtls_ssl_get_peer_cert`).
+2. From each cert, extract the RSA public key's **modulus (N)** and **exponent (E)** as big-endian byte arrays (`mbedtls_pk_rsa` → `mbedtls_rsa_export` → `mbedtls_mpi_write_binary`).
+3. The TV displays a short hex **code**; the user types it into the web page's pairing form, which POSTs it to the ESP32. Hex-decode it. `byte[0]` is a checksum; `bytes[1:]` are the **nonce**.
+4. Compute `hash = SHA-256( client_N ++ client_E ++ server_N ++ server_E ++ nonce )`.
+5. **Verify** `hash[0] == decoded_code[0]`. If it doesn't match, the code was mistyped or the byte encoding is wrong — do not send.
+6. Send the hash back in the PairingSecret message; expect the Ack.
+
+**Byte-ordering gotchas to test explicitly:**
+- Match Python's integer-to-bytes representation: minimal big-endian, **no** sign/leading-zero padding byte. mbedTLS `mpi_write_binary` may include or omit a leading zero depending on how you size the buffer — normalize to match the oracle from §5.
+- Confirm the exact concatenation order (client-before-server, N-before-E) against the reference; do not assume.
+- The unit test from §5 must pass on fixed inputs before any live attempt.
+
+---
+
+## 8. Persistence & config
+
+- Store in NVS: WiFi creds, TV IP (or use mDNS), client cert + key (if generated on-device), and a `paired` boolean.
+- On boot: if `paired`, skip straight to the control channel (Phase 4+); else run pairing (Phase 3).
+- Keep the client key/cert **stable** across reboots — regenerating it invalidates the TV's trust and forces re-pairing.
+
+---
+
+## 9. Web UI control mapping (suggested minimum)
+
+D-pad up/down/left/right, select/OK, back, home, plus volume up/down and power, each a button in `web/index.html` mapped to the corresponding `TvKeys.txt` keycode via `POST /api/key`. Debounce/rate-limit isn't a hardware concern here (no switch bounce), but do disable double-fire on fast repeat taps client-side. Optional: an "assistant" button and a small set of app-launch shortcuts via `RemoteAppLinkLaunchRequest` with deep links, surfaced as extra buttons or a small app grid in the page.
+
+---
+
+## 10. Definition of done
+
+- Cold boot with no prior pairing serves a web page (found via mDNS) that walks the user through entering the TV's code and pairs successfully — no serial interaction required.
+- Subsequent boots connect to the control channel automatically and stay alive indefinitely (keepalive holds).
+- Any device on the same LAN can open the ESP32's web UI and drive the TV — navigation, volume, power — with no perceptible desync, and the UI looks like a real, modern app rather than a debug page.
+- Multiple devices can load the page and control the TV without stepping on each other.
+- Network/power interruptions recover without re-pairing.
+- The pairing-secret unit test passes against the Python oracle.
+
+---
+
+## 11. Stretch goals (after core works)
+
+- On-device RSA keypair + self-signed cert generation on first boot (removes the embedded key), accepting the one-time ~30s+ keygen cost.
+- mDNS auto-discovery of the TV (no hardcoded IP).
+- WebSocket push for connection/now-playing state instead of polling `/api/status`.
+- A PWA manifest + icon so the web UI can be "installed" to a phone home screen like a native remote app.
+- Text entry (on-screen keyboard in the web UI feeding `RemoteImeKeyInject`) and app-launch shortcuts.
+- Low-power sleep between key presses with fast reconnect.
+- A tiny status display (OLED) showing connection state.
+- Optional physical GPIO buttons as a secondary input path, mapped to the same `/api/key`-equivalent internal call.
+
+---
+
+### Suggested project layout
+```
+platformio.ini           # platform = espressif32, framework = espidf
+/main
+  main.c                 # app entry, WiFi, top-level state machine
+  net_tls.c/.h           # mbedTLS mutual-TLS client (ports 6466/6467)
+  proto_frame.c/.h       # varint length-delimited read/write over TLS
+  pairing.c/.h           # pairing state machine + secret (§7)
+  remote.c/.h            # control channel: configure, keepalive, key inject
+  webserver.c/.h         # esp_http_server: serves web/ + /api/status, /api/pair, /api/key
+  store.c/.h             # NVS persistence
+/web
+  index.html             # single-page control UI (inline CSS/JS), embedded via board_build.embed_files
+/proto                   # .proto files from the reference repo
+/certs                   # embedded client cert/key (dev)
+CMakeLists.txt            # EXTRA_COMPONENT_DIRS for vendored components (e.g. nanopb)
+```
+
+**First action for the agent:** fetch the reference `.proto` files and the `pairing`/`remote` source from `tronikos/androidtvremote2`, then stand up the Python library as the reference oracle (§5) *before* writing firmware.

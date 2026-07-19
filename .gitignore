@@ -1,0 +1,8 @@
+.pio/
+sdkconfig.esp32doit-devkit-v1
+sdkconfig.old
+managed_components/
+dependencies.lock
+__pycache__/
+certs/*.pem
+certs/*.key
