@@ -15,6 +15,27 @@ static const char *TAG = "webserver";
 // web/index.html embedded via board_build.embed_txtfiles (null-terminated).
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
 extern const uint8_t index_html_end[] asm("_binary_index_html_end");
+// PWA icons embedded via board_build.embed_files (binary, no terminator).
+extern const uint8_t icon192_start[] asm("_binary_icon_192_png_start");
+extern const uint8_t icon192_end[] asm("_binary_icon_192_png_end");
+extern const uint8_t icon512_start[] asm("_binary_icon_512_png_start");
+extern const uint8_t icon512_end[] asm("_binary_icon_512_png_end");
+extern const uint8_t apple_icon_start[] asm("_binary_apple_touch_icon_png_start");
+extern const uint8_t apple_icon_end[] asm("_binary_apple_touch_icon_png_end");
+
+static const char MANIFEST_JSON[] =
+    "{"
+    "\"name\":\"TV Remote\","
+    "\"short_name\":\"TV Remote\","
+    "\"start_url\":\"/\","
+    "\"display\":\"standalone\","
+    "\"background_color\":\"#0c0f13\","
+    "\"theme_color\":\"#101418\","
+    "\"icons\":["
+    "{\"src\":\"/icon-192.png\",\"sizes\":\"192x192\",\"type\":\"image/png\"},"
+    "{\"src\":\"/icon-512.png\",\"sizes\":\"512x512\",\"type\":\"image/png\"}"
+    "]"
+    "}";
 
 static esp_err_t index_get_handler(httpd_req_t *req)
 {
@@ -25,6 +46,25 @@ static esp_err_t index_get_handler(httpd_req_t *req)
     // -1: skip the null terminator appended by the embedder
     return httpd_resp_send(req, (const char *)index_html_start,
                            index_html_end - index_html_start - 1);
+}
+
+static esp_err_t manifest_get_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "application/manifest+json");
+    return httpd_resp_send(req, MANIFEST_JSON, sizeof(MANIFEST_JSON) - 1);
+}
+
+static esp_err_t png_handler(httpd_req_t *req)
+{
+    const uint8_t *start = req->user_ctx == (void *)1   ? icon192_start
+                           : req->user_ctx == (void *)2 ? icon512_start
+                                                        : apple_icon_start;
+    const uint8_t *end = req->user_ctx == (void *)1   ? icon192_end
+                         : req->user_ctx == (void *)2 ? icon512_end
+                                                      : apple_icon_end;
+    httpd_resp_set_type(req, "image/png");
+    httpd_resp_set_hdr(req, "Cache-Control", "max-age=86400");
+    return httpd_resp_send(req, (const char *)start, end - start);
 }
 
 static esp_err_t status_get_handler(httpd_req_t *req)
@@ -214,6 +254,22 @@ esp_err_t webserver_start(void)
     static const httpd_uri_t app_uri = {
         .uri = "/api/app", .method = HTTP_POST, .handler = app_post_handler
     };
+    static const httpd_uri_t manifest_uri = {
+        .uri = "/manifest.webmanifest", .method = HTTP_GET, .handler = manifest_get_handler
+    };
+    static const httpd_uri_t icon192_uri = {
+        .uri = "/icon-192.png", .method = HTTP_GET, .handler = png_handler, .user_ctx = (void *)1
+    };
+    static const httpd_uri_t icon512_uri = {
+        .uri = "/icon-512.png", .method = HTTP_GET, .handler = png_handler, .user_ctx = (void *)2
+    };
+    static const httpd_uri_t apple_icon_uri = {
+        .uri = "/apple-touch-icon.png", .method = HTTP_GET, .handler = png_handler, .user_ctx = (void *)3
+    };
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &manifest_uri));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &icon192_uri));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &icon512_uri));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &apple_icon_uri));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &index_uri));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &status_uri));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &pair_uri));
