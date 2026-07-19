@@ -1,0 +1,18 @@
+# nanopb sizing for control-channel messages (remotemessage.proto)
+# Voice payloads are not supported on ESP32 (RAM); leave samples as a callback.
+remote.RemoteAppLinkLaunchRequest.app_link      max_size:128
+remote.RemoteSetVolumeLevel.player_model        max_size:64
+remote.RemoteVoicePayload.samples               type:FT_CALLBACK
+remote.RemoteVoiceBegin.package_name            max_size:64
+remote.RemoteTextFieldStatus.value              max_size:128
+remote.RemoteTextFieldStatus.label              max_size:64
+remote.RemoteImeObject.value                    max_size:128
+remote.RemoteImeBatchEdit.edit_info             max_count:2
+remote.RemoteAppInfo.int4                       max_size:64
+remote.RemoteAppInfo.label                      max_size:64
+remote.RemoteAppInfo.app_package                max_size:128
+remote.RemoteDeviceInfo.model                   max_size:64
+remote.RemoteDeviceInfo.vendor                  max_size:64
+remote.RemoteDeviceInfo.unknown2                max_size:16
+remote.RemoteDeviceInfo.package_name            max_size:64
+remote.RemoteDeviceInfo.app_version             max_size:32

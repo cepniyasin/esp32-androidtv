@@ -1,0 +1,8 @@
+# nanopb sizing for pairing messages (polo.proto)
+polo.wire.protobuf.PairingRequest.service_name    max_size:32
+polo.wire.protobuf.PairingRequest.client_name     max_size:32
+polo.wire.protobuf.PairingRequestAck.server_name  max_size:64
+polo.wire.protobuf.Options.input_encodings        max_count:4
+polo.wire.protobuf.Options.output_encodings       max_count:4
+polo.wire.protobuf.Secret.secret                  max_size:32
+polo.wire.protobuf.SecretAck.secret               max_size:32
