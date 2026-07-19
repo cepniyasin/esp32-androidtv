@@ -6,3 +6,4 @@ dependencies.lock
 __pycache__/
 certs/*.pem
 certs/*.key
+build/

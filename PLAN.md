@@ -9,7 +9,7 @@
 
 **Last updated:** 2026-07-19
 
-**Current phase:** Phase 1 done (verified on hardware 2026-07-19: mutual TLS to the Chromecast HD at 192.168.0.104:6467, TLSv1.2 ECDHE-RSA-AES128-GCM, peer cert subject read from live session). Next: Phase 2 (protobuf framing).
+**Current phase:** Phase 1 done (verified on hardware 2026-07-19: mutual TLS to the Chromecast HD at 192.168.0.104:6467, TLSv1.2 ECDHE-RSA-AES128-GCM, peer cert subject read from live session). Phase 2 done: `main/proto_frame.c` (transport-agnostic varint framing) passes host unit tests (`tools/test_host.sh`) against golden bytes generated from the reference library's own protobuf encoding (`test/gen_golden.py` → `test/golden.inc`) — byte-for-byte match on send, partial-read/back-to-back/error cases on recv. Next: Phase 3 (web server + mDNS).
 
 Additional decisions:
 

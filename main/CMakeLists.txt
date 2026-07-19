@@ -2,6 +2,7 @@ idf_component_register(
     SRCS "main.c"
          "wifi.c"
          "net_tls.c"
+         "proto_frame.c"
          "proto_gen/polo.pb.c"
          "proto_gen/remotemessage.pb.c"
     INCLUDE_DIRS "." "proto_gen"

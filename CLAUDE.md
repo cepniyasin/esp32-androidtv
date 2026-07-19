@@ -51,7 +51,7 @@ Facts already verified against `pairing.py` / `remote.py` (v2 protocol):
 
 - [x] Phase 0 — scaffolding (PlatformIO + espidf, nanopb vendored, codegen, WiFi bring-up)
 - [x] Phase 1 — mutual TLS to :6467 (verified against the real Chromecast HD)
-- [ ] Phase 2 — protobuf framing
+- [x] Phase 2 — protobuf framing (host tests: `tools/test_host.sh`, golden bytes from reference lib in `test/`)
 - [ ] Phase 3 — web server bring-up (+mDNS)
 - [ ] Phase 4 — pairing state machine + secret
 - [ ] Phase 5 — control channel + keepalive
