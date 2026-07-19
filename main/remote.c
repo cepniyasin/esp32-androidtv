@@ -5,6 +5,7 @@
 #include "app_state.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "freertos/task.h"
 #include "pb_decode.h"
 #include "proto_frame.h"
 #include "remotemessage.pb.h"
@@ -190,6 +191,9 @@ esp_err_t remote_session(atv_tls_t *tls)
                 if (send_key(tls, &cmd) != ESP_OK) {
                     return ESP_FAIL;
                 }
+                // The TV closes the session when key events arrive
+                // back-to-back faster than a human remote could send them.
+                vTaskDelay(pdMS_TO_TICKS(50));
             }
             int64_t now = esp_timer_get_time();
             if (probe_outstanding) {
