@@ -62,7 +62,7 @@ const msgEl = document.getElementById('pairmsg');
 let pairing = false;
 
 async function poll() {
-  if (pairing) return;
+  if (pairing || holding) return;
   try {
     const s = await (await fetch('/api/status')).json();
     statusEl.textContent =
@@ -115,6 +115,7 @@ function sendKey(key, direction = 'SHORT') {
 // treat the pair as bounce and ignore it.
 const MIN_PRESS_MS = 150;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+let holding = false;  // suppress status polling during a hold
 
 document.querySelectorAll('#keys button').forEach(b => {
   const key = b.dataset.key;
@@ -125,18 +126,22 @@ document.querySelectorAll('#keys button').forEach(b => {
       if (!downAt) return;
       const held = Date.now() - downAt;
       downAt = 0;
+      holding = false;
       if (held < MIN_PRESS_MS) await sleep(MIN_PRESS_MS - held);
       sendKey(key, 'END_LONG');
     };
     b.addEventListener('pointerdown', e => {
       e.preventDefault();
       if (downAt) return;  // debounce double-fire
+      // Capture the pointer so finger drift off the button doesn't end
+      // the hold (pointerleave would otherwise fire mid-hold).
+      b.setPointerCapture(e.pointerId);
       downAt = Date.now();
+      holding = true;
       sendKey(key, 'START_LONG');
     });
     b.addEventListener('pointerup', release);
     b.addEventListener('pointercancel', release);
-    b.addEventListener('pointerleave', release);
     b.addEventListener('contextmenu', e => e.preventDefault());
   } else if (b.dataset.tapPair !== undefined) {
     // Keys the TV ignores as SHORT (volume group): press, hold MIN_PRESS_MS,
