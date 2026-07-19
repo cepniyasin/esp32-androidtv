@@ -12,24 +12,64 @@
     justify-content: center; min-height: 100vh; margin: 0; gap: 1rem;
   }
   #status { font-size: 0.9rem; opacity: 0.7; }
+  #pair { display: none; flex-direction: column; align-items: center; gap: 0.5rem; }
+  #pair.visible { display: flex; }
+  #code { font-size: 1.4rem; width: 8ch; text-align: center;
+          text-transform: uppercase; letter-spacing: 0.2ch; }
+  #pairmsg { font-size: 0.9rem; min-height: 1.2em; }
 </style>
 </head>
 <body>
 <h1>Android TV Remote</h1>
 <p id="status">checking status…</p>
+<div id="pair">
+  <p>Enter the code shown on the TV:</p>
+  <input id="code" maxlength="6" autocomplete="off" spellcheck="false" placeholder="A1B2C3">
+  <button id="send">Pair</button>
+  <p id="pairmsg"></p>
+</div>
 <script>
+const statusEl = document.getElementById('status');
+const pairEl = document.getElementById('pair');
+const msgEl = document.getElementById('pairmsg');
+let pairing = false;
+
 async function poll() {
+  if (pairing) return;
   try {
-    const r = await fetch('/api/status');
-    const s = await r.json();
-    document.getElementById('status').textContent =
-      `paired: ${s.paired} · connected: ${s.connected}`;
+    const s = await (await fetch('/api/status')).json();
+    statusEl.textContent =
+      `state: ${s.state} · paired: ${s.paired} · connected: ${s.connected}`;
+    pairEl.classList.toggle('visible', s.state === 'wait_code');
   } catch (e) {
-    document.getElementById('status').textContent = 'esp32 unreachable';
+    statusEl.textContent = 'esp32 unreachable';
   }
 }
+
+document.getElementById('send').onclick = async () => {
+  const code = document.getElementById('code').value.trim().toUpperCase();
+  if (!/^[0-9A-F]{6}$/.test(code)) {
+    msgEl.textContent = 'code must be 6 hex characters';
+    return;
+  }
+  pairing = true;
+  msgEl.textContent = 'pairing…';
+  try {
+    const r = await (await fetch('/api/pair', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({code}),
+    })).json();
+    msgEl.textContent = r.ok ? 'paired!' : (r.error || 'failed');
+  } catch (e) {
+    msgEl.textContent = 'request failed';
+  }
+  pairing = false;
+  poll();
+};
+
 poll();
-setInterval(poll, 3000);
+setInterval(poll, 2000);
 </script>
 </body>
 </html>

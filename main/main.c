@@ -1,10 +1,13 @@
 #include <string.h>
 
+#include "app_state.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "net_tls.h"
 #include "nvs_flash.h"
+#include "pairing.h"
+#include "store.h"
 #include "webserver.h"
 #include "pb_decode.h"
 #include "pb_encode.h"
@@ -49,28 +52,44 @@ static void proto_selftest(void)
              (unsigned)ostream.bytes_written, (int)remote_RemoteKeyCode_KEYCODE_DPAD_UP);
 }
 
-// Phase 1 acceptance: mutual-TLS handshake to the TV's pairing port and read
-// the peer certificate from the live session. Runs in its own task — the TLS
-// handshake needs more stack than app_main's.
+// Blocks until the web form delivers a code (or 180 s pass). The TV keeps
+// showing the code the whole time.
+static bool code_from_web(char code[7], void *ctx)
+{
+    (void)ctx;
+    return xQueueReceive(g_pair_code_queue, code, pdMS_TO_TICKS(180000)) == pdTRUE;
+}
+
+// Owns all TV-facing I/O (PLAN.md §4.5): pairs if needed, then (Phase 5)
+// will run the control channel. Separate task: TLS needs the stack.
 static void tv_session_task(void *arg)
 {
-    atv_tls_t tls;
-    while (true) {
-        if (atv_tls_connect(&tls, CONFIG_ATV_TV_IP, 6467) == ESP_OK) {
-            const mbedtls_x509_crt *peer = atv_tls_peer_cert(&tls);
-            if (peer != NULL) {
-                char subject[128];
-                mbedtls_x509_dn_gets(subject, sizeof(subject), &peer->subject);
-                ESP_LOGI(TAG, "Phase 1 complete: TV peer cert subject: %s", subject);
-            } else {
-                ESP_LOGE(TAG, "Handshake OK but no peer certificate available");
-            }
-            atv_tls_close(&tls);
-            break;
+    (void)arg;
+    while (!g_atv_status.paired) {
+        atv_tls_t tls;
+        if (atv_tls_connect(&tls, CONFIG_ATV_TV_IP, 6467) != ESP_OK) {
+            ESP_LOGW(TAG, "Pairing connect failed, retrying in 5 s (is the TV on?)");
+            g_atv_status.state = ATV_STATE_PAIR_FAILED;
+            vTaskDelay(pdMS_TO_TICKS(5000));
+            continue;
         }
-        ESP_LOGW(TAG, "TLS connect failed, retrying in 5 s (is the TV on?)");
-        vTaskDelay(pdMS_TO_TICKS(5000));
+        esp_err_t err = pairing_run(&tls, code_from_web, NULL);
+        atv_tls_close(&tls);
+        if (err == ESP_OK) {
+            ESP_ERROR_CHECK(store_set_paired(true));
+            g_atv_status.paired = true;
+            g_atv_status.state = ATV_STATE_PAIRED;
+            xEventGroupSetBits(g_pair_events, PAIR_EVENT_OK);
+            ESP_LOGI(TAG, "Phase 4 complete: paired with the TV");
+        } else {
+            g_atv_status.state = ATV_STATE_PAIR_FAILED;
+            xEventGroupSetBits(g_pair_events, PAIR_EVENT_FAIL);
+            ESP_LOGW(TAG, "Pairing attempt failed (%s); restarting exchange",
+                     esp_err_to_name(err));
+            vTaskDelay(pdMS_TO_TICKS(2000));
+        }
     }
+    // Phase 5 will connect to the control port here.
     vTaskDelete(NULL);
 }
 
@@ -83,7 +102,11 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
+    app_state_init();
     proto_selftest();
+    ESP_ERROR_CHECK(pairing_selftest());  // §5: never pair live with unverified math
+
+    g_atv_status.paired = store_get_paired();
 
     if (wifi_connect() != ESP_OK) {
         ESP_LOGE(TAG, "WiFi not configured; halting here.");
@@ -94,5 +117,10 @@ void app_main(void)
 
     ESP_ERROR_CHECK(webserver_start());
 
-    xTaskCreate(tv_session_task, "tv_session", 10240, NULL, 5, NULL);
+    if (g_atv_status.paired) {
+        g_atv_status.state = ATV_STATE_PAIRED;
+        ESP_LOGI(TAG, "Already paired; control channel comes in Phase 5.");
+    } else {
+        xTaskCreate(tv_session_task, "tv_session", 10240, NULL, 5, NULL);
+    }
 }

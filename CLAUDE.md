@@ -52,8 +52,8 @@ Facts already verified against `pairing.py` / `remote.py` (v2 protocol):
 - [x] Phase 0 — scaffolding (PlatformIO + espidf, nanopb vendored, codegen, WiFi bring-up)
 - [x] Phase 1 — mutual TLS to :6467 (verified against the real Chromecast HD)
 - [x] Phase 2 — protobuf framing (host tests: `tools/test_host.sh`, golden bytes from reference lib in `test/`)
-- [ ] Phase 3 — web server bring-up (+mDNS)
-- [ ] Phase 4 — pairing state machine + secret
+- [x] Phase 3 — web server bring-up (+mDNS, verified from LAN via androidtv-remote.local)
+- [ ] Phase 4 — pairing state machine + secret (code + oracle selftest done; live pairing pending). NOTE: if `tools/gen_cert.sh` ever regenerates the cert, rerun `test/gen_pairing_oracle.py` — `test/golden_pairing.inc` is derived from the local client cert.
 - [ ] Phase 5 — control channel + keepalive
 - [ ] Phase 6 — key injection
 - [ ] Phase 7 — web UI polish
