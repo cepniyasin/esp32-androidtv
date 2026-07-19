@@ -152,6 +152,9 @@ static bool handle_msg(const remote_RemoteMessage *in, remote_RemoteMessage *out
         return false;
     }
     if (in->has_remote_set_volume_level) {
+        g_atv_status.vol_level = in->remote_set_volume_level.volume_level;
+        g_atv_status.vol_max = in->remote_set_volume_level.volume_max;
+        g_atv_status.vol_muted = in->remote_set_volume_level.volume_muted;
         // Debug level: the TV streams these rapidly during a volume ramp.
         ESP_LOGD(TAG, "volume %d/%d%s", (int)in->remote_set_volume_level.volume_level,
                  (int)in->remote_set_volume_level.volume_max,

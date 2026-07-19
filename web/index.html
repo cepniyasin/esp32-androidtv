@@ -27,6 +27,7 @@
     -webkit-tap-highlight-color: transparent;  /* no Android tap flash */
   }
   #keys button { padding: 0.8rem 0; font-size: 0.9rem; }
+  #keys button.nosupport { opacity: 0.35; }
 </style>
 </head>
 <body>
@@ -51,9 +52,9 @@
   <button data-key="HOME">⌂</button>
   <button data-key="DPAD_DOWN" data-hold>▼</button>
   <button data-key="MEDIA_PLAY_PAUSE">⏯</button>
-  <button data-key="VOLUME_DOWN" data-hold>V−</button>
-  <button data-key="VOLUME_MUTE" data-tap-pair>🔇</button>
-  <button data-key="VOLUME_UP" data-hold>V+</button>
+  <button data-key="VOLUME_DOWN" data-hold data-vol>V−</button>
+  <button data-key="VOLUME_MUTE" data-vol>🔇</button>
+  <button data-key="VOLUME_UP" data-hold data-vol>V+</button>
 </div>
 <script>
 const statusEl = document.getElementById('status');
@@ -69,6 +70,13 @@ async function poll() {
       `state: ${s.state} · paired: ${s.paired} · connected: ${s.connected}`;
     pairEl.classList.toggle('visible', s.state === 'wait_code');
     document.getElementById('keys').classList.toggle('visible', s.connected);
+    // max == 0: the device delegates volume to the TV over CEC; the
+    // protocol cannot change it, so mark those buttons unsupported.
+    const volOk = s.volume && s.volume.max > 0;
+    document.querySelectorAll('[data-vol]').forEach(v => {
+      v.classList.toggle('nosupport', !volOk);
+      v.title = volOk ? '' : 'volume not controllable on this device';
+    });
   } catch (e) {
     statusEl.textContent = 'esp32 unreachable';
   }
@@ -143,18 +151,6 @@ document.querySelectorAll('#keys button').forEach(b => {
     b.addEventListener('pointerup', release);
     b.addEventListener('pointercancel', release);
     b.addEventListener('contextmenu', e => e.preventDefault());
-  } else if (b.dataset.tapPair !== undefined) {
-    // Keys the TV ignores as SHORT (volume group): press, hold MIN_PRESS_MS,
-    // release. Guard against re-entry while the pair is in flight.
-    let busy = false;
-    b.onclick = async () => {
-      if (busy) return;
-      busy = true;
-      sendKey(key, 'START_LONG');
-      await sleep(MIN_PRESS_MS);
-      await sendKey(key, 'END_LONG');
-      busy = false;
-    };
   } else {
     b.onclick = () => sendKey(key);
   }

@@ -22,6 +22,11 @@ typedef struct {
     volatile bool paired;
     volatile bool connected;
     volatile atv_state_t state;
+    // From remote_set_volume_level. max == 0 means the device delegates
+    // volume to the TV over CEC and the protocol cannot change it.
+    volatile int vol_level;
+    volatile int vol_max;
+    volatile bool vol_muted;
 } atv_status_t;
 
 extern atv_status_t g_atv_status;

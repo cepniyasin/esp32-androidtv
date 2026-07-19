@@ -29,12 +29,15 @@ static esp_err_t index_get_handler(httpd_req_t *req)
 
 static esp_err_t status_get_handler(httpd_req_t *req)
 {
-    char body[96];
+    char body[160];
     int len = snprintf(body, sizeof(body),
-                       "{\"paired\":%s,\"connected\":%s,\"state\":\"%s\"}",
+                       "{\"paired\":%s,\"connected\":%s,\"state\":\"%s\","
+                       "\"volume\":{\"level\":%d,\"max\":%d,\"muted\":%s}}",
                        g_atv_status.paired ? "true" : "false",
                        g_atv_status.connected ? "true" : "false",
-                       atv_state_str(g_atv_status.state));
+                       atv_state_str(g_atv_status.state),
+                       g_atv_status.vol_level, g_atv_status.vol_max,
+                       g_atv_status.vol_muted ? "true" : "false");
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, body, len);
 }
