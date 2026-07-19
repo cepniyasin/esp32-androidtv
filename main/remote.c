@@ -20,8 +20,13 @@ static const char *TAG = "remote";
 #define FEAT_APP_LINK 512
 #define FEATURES_DEFAULT (FEAT_PING | FEAT_KEY | FEAT_POWER | FEAT_VOLUME | FEAT_APP_LINK)
 
-// Server pings every ~5 s; reference treats 16 s of silence as dead.
-#define IDLE_DISCONNECT_MS 16000
+// The reference assumes the server pings every 5 s and drops after 16 s of
+// silence — but the Chromecast HD goes quiet for long stretches, so that
+// rule kills healthy connections. Instead: after PING_PROBE_MS of silence
+// send our own remote_ping_request, and only reconnect if the reply doesn't
+// arrive within PING_REPLY_MS.
+#define PING_PROBE_MS 10000
+#define PING_REPLY_MS 5000
 // Poll granularity for the key queue while waiting for TV messages.
 #define POLL_TIMEOUT_MS 200
 
@@ -156,10 +161,20 @@ static bool handle_msg(const remote_RemoteMessage *in, remote_RemoteMessage *out
     return false;
 }
 
+static esp_err_t send_ping_probe(atv_tls_t *tls)
+{
+    remote_RemoteMessage m = remote_RemoteMessage_init_zero;
+    m.has_remote_ping_request = true;
+    m.remote_ping_request.val1 = 1;
+    return send_msg(tls, &m);
+}
+
 esp_err_t remote_session(atv_tls_t *tls)
 {
     int active_features = FEATURES_DEFAULT;
     int64_t last_rx_us = esp_timer_get_time();
+    bool probe_outstanding = false;
+    int64_t probe_sent_us = 0;
     uint8_t buf[FRAME_MAX_MSG];
 
     while (true) {
@@ -173,9 +188,18 @@ esp_err_t remote_session(atv_tls_t *tls)
                     return ESP_FAIL;
                 }
             }
-            if ((esp_timer_get_time() - last_rx_us) / 1000 > IDLE_DISCONNECT_MS) {
-                ESP_LOGW(TAG, "No traffic for %d ms; reconnecting", IDLE_DISCONNECT_MS);
-                return ESP_ERR_TIMEOUT;
+            int64_t now = esp_timer_get_time();
+            if (probe_outstanding) {
+                if ((now - probe_sent_us) / 1000 > PING_REPLY_MS) {
+                    ESP_LOGW(TAG, "Ping probe unanswered; reconnecting");
+                    return ESP_ERR_TIMEOUT;
+                }
+            } else if ((now - last_rx_us) / 1000 > PING_PROBE_MS) {
+                if (send_ping_probe(tls) != ESP_OK) {
+                    return ESP_FAIL;
+                }
+                probe_outstanding = true;
+                probe_sent_us = now;
             }
             continue;
         }
@@ -191,6 +215,7 @@ esp_err_t remote_session(atv_tls_t *tls)
             return ESP_FAIL;
         }
         last_rx_us = esp_timer_get_time();
+        probe_outstanding = false;  // any traffic proves liveness
 
         remote_RemoteMessage in = remote_RemoteMessage_init_zero;
         pb_istream_t is = pb_istream_from_buffer(buf, (size_t)len);
