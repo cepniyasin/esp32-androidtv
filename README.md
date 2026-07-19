@@ -132,6 +132,56 @@ pio run -t monitor       # serial log, 115200 baud
 - `CLAUDE.md` records protocol ground truth and hard-won device quirks — read
   it before touching pairing, keepalive, or key-direction logic.
 
+## Adding app shortcut buttons
+
+The Netflix/YouTube buttons are just app **deep links** sent through
+`RemoteAppLinkLaunchRequest` — adding another app is a small edit to
+`web/index.html`.
+
+**1. Find a link that works.** Test candidates live against your TV without
+touching the firmware:
+
+```sh
+curl -X POST http://androidtv-remote.local/api/app \
+     -H 'Content-Type: application/json' \
+     -d '{"link":"https://www.disneyplus.com"}'
+```
+
+Known-working examples (may vary by app version):
+
+| App | Link |
+|-----|------|
+| YouTube | `https://www.youtube.com/tv` |
+| Netflix | `netflix://home` |
+| Disney+ | `https://www.disneyplus.com` |
+| Prime Video | `https://app.primevideo.com` |
+| Spotify | `spotify://` |
+| YouTube Music | `https://music.youtube.com` |
+
+Many apps accept their website URL as a deep link. If nothing happens on the
+TV, search "<app name> android tv deep link" — anything the app registers as
+an Android intent filter works.
+
+**2. Add the button** in the `#apps` grid in `web/index.html`:
+
+```html
+<button id="app-disney" data-link="https://www.disneyplus.com">Disney+</button>
+```
+
+The `data-link` attribute is all the wiring there is — every `[data-link]`
+button POSTs to `/api/app` automatically. Optionally add a brand color in the
+CSS next to the existing entries:
+
+```css
+#app-disney { background: #16213a; color: #6ab5f8; }
+```
+
+With three or more apps, consider `#apps { grid-template-columns: repeat(3, 1fr); }`.
+
+**3. Reflash** (`pio run -t upload`) and refresh the page — the UI is
+embedded in the firmware. Links longer than 127 characters are rejected
+(`APP_LINK_MAX` in `main/app_state.h`).
+
 ## Device quirks (learned the hard way)
 
 - **Volume/mute don't work on Chromecast HD — and can't.** The device
