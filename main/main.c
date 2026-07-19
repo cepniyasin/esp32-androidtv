@@ -104,7 +104,9 @@ static void tv_session_task(void *arg)
         g_atv_status.state = ATV_STATE_PAIRED;
         ESP_LOGW(TAG, "Control channel down; reconnecting in %u ms", (unsigned)backoff_ms);
         vTaskDelay(pdMS_TO_TICKS(backoff_ms));
-        if (backoff_ms < 30000) {
+        // Cap low enough that recovery after a WiFi/TV outage never feels
+        // stuck: worst case ~15 s after the network is back.
+        if (backoff_ms < 15000) {
             backoff_ms *= 2;
         }
     }

@@ -189,6 +189,9 @@ esp_err_t remote_session(atv_tls_t *tls)
             key_cmd_t cmd;
             while (g_key_queue && xQueueReceive(g_key_queue, &cmd, 0) == pdTRUE) {
                 if (send_key(tls, &cmd) != ESP_OK) {
+                    // Put the command back so it survives the reconnect
+                    // instead of a press silently vanishing.
+                    xQueueSendToFront(g_key_queue, &cmd, 0);
                     return ESP_FAIL;
                 }
                 // The TV closes the session when key events arrive
@@ -203,6 +206,7 @@ esp_err_t remote_session(atv_tls_t *tls)
                         sizeof(m.remote_app_link_launch_request.app_link));
                 ESP_LOGI(TAG, "launching app link: %s", link);
                 if (send_msg(tls, &m) != ESP_OK) {
+                    xQueueSendToFront(g_app_queue, link, 0);
                     return ESP_FAIL;
                 }
             }

@@ -21,8 +21,9 @@ static void event_handler(void *arg, esp_event_base_t base, int32_t id, void *da
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
+        // Retry immediately: the driver paces reconnect attempts itself, and
+        // sleeping here would stall the shared event loop task.
         ESP_LOGW(TAG, "Disconnected, retrying...");
-        vTaskDelay(pdMS_TO_TICKS(1000));
         esp_wifi_connect();
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)data;
@@ -62,5 +63,9 @@ esp_err_t wifi_connect(void)
 
     ESP_LOGI(TAG, "Connecting to '%s'...", CONFIG_ATV_WIFI_SSID);
     xEventGroupWaitBits(s_wifi_events, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
+
+    // Modem power save adds tens of ms of latency per packet — noticeable on
+    // every key press. This is a mains-powered remote; keep the radio awake.
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
     return ESP_OK;
 }
