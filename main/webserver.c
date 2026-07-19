@@ -232,6 +232,8 @@ esp_err_t webserver_start(void)
     // Phones hold several keep-alive connections; without LRU purge the
     // server starts refusing new requests, which looks like dropouts.
     config.lru_purge_enable = true;
+    // Default is 8; we register 9 (page, manifest, 3 icons, 4 API).
+    config.max_uri_handlers = 12;
     httpd_handle_t server = NULL;
     esp_err_t err = httpd_start(&server, &config);
     if (err != ESP_OK) {
