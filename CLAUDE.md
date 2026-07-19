@@ -50,7 +50,7 @@ Facts already verified against `pairing.py` / `remote.py` (v2 protocol):
 ## Phase status
 
 - [x] Phase 0 — scaffolding (PlatformIO + espidf, nanopb vendored, codegen, WiFi bring-up)
-- [ ] Phase 1 — mutual TLS to :6467
+- [x] Phase 1 — mutual TLS to :6467 (verified against the real Chromecast HD)
 - [ ] Phase 2 — protobuf framing
 - [ ] Phase 3 — web server bring-up (+mDNS)
 - [ ] Phase 4 — pairing state machine + secret

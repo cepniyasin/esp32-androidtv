@@ -1,6 +1,9 @@
 #include <string.h>
 
 #include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "net_tls.h"
 #include "nvs_flash.h"
 #include "pb_decode.h"
 #include "pb_encode.h"
@@ -45,6 +48,31 @@ static void proto_selftest(void)
              (unsigned)ostream.bytes_written, (int)remote_RemoteKeyCode_KEYCODE_DPAD_UP);
 }
 
+// Phase 1 acceptance: mutual-TLS handshake to the TV's pairing port and read
+// the peer certificate from the live session. Runs in its own task — the TLS
+// handshake needs more stack than app_main's.
+static void tv_session_task(void *arg)
+{
+    atv_tls_t tls;
+    while (true) {
+        if (atv_tls_connect(&tls, CONFIG_ATV_TV_IP, 6467) == ESP_OK) {
+            const mbedtls_x509_crt *peer = atv_tls_peer_cert(&tls);
+            if (peer != NULL) {
+                char subject[128];
+                mbedtls_x509_dn_gets(subject, sizeof(subject), &peer->subject);
+                ESP_LOGI(TAG, "Phase 1 complete: TV peer cert subject: %s", subject);
+            } else {
+                ESP_LOGE(TAG, "Handshake OK but no peer certificate available");
+            }
+            atv_tls_close(&tls);
+            break;
+        }
+        ESP_LOGW(TAG, "TLS connect failed, retrying in 5 s (is the TV on?)");
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
+    vTaskDelete(NULL);
+}
+
 void app_main(void)
 {
     esp_err_t ret = nvs_flash_init();
@@ -62,4 +90,6 @@ void app_main(void)
     }
 
     ESP_LOGI(TAG, "Phase 0 complete: WiFi up, nanopb working.");
+
+    xTaskCreate(tv_session_task, "tv_session", 10240, NULL, 5, NULL);
 }

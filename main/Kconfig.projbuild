@@ -12,4 +12,11 @@ menu "Android TV Remote"
         help
             Password of the WiFi network (leave empty for open networks).
 
+    config ATV_TV_IP
+        string "Android TV / Chromecast IP address"
+        default "192.168.0.104"
+        help
+            LAN IP of the TV. Pairing uses port 6467, control port 6466.
+            (mDNS discovery is a later stretch goal.)
+
 endmenu
