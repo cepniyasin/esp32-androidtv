@@ -19,6 +19,9 @@ extern const uint8_t index_html_end[] asm("_binary_index_html_end");
 static esp_err_t index_get_handler(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/html");
+    // The page is versioned by firmware, not by URL; stale cached JS after
+    // a reflash has already caused confusing bugs.
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     // -1: skip the null terminator appended by the embedder
     return httpd_resp_send(req, (const char *)index_html_start,
                            index_html_end - index_html_start - 1);

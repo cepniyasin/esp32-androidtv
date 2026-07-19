@@ -91,30 +91,60 @@ document.getElementById('send').onclick = async () => {
   poll();
 };
 
+// All key sends go through one promise chain: two parallel fetches can
+// arrive out of order (separate connections), and a release overtaking
+// its press makes the TV drop the key entirely.
+let keyChain = Promise.resolve();
 function sendKey(key, direction = 'SHORT') {
-  return fetch('/api/key', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({key, direction}),
-  }).catch(() => {});
+  keyChain = keyChain
+    .then(() => fetch('/api/key', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({key, direction}),
+    }))
+    .catch(() => {});
+  return keyChain;
 }
+
+// Minimum press duration for press/release pairs; below this the TV may
+// treat the pair as bounce and ignore it.
+const MIN_PRESS_MS = 150;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 document.querySelectorAll('#keys button').forEach(b => {
   const key = b.dataset.key;
   if (b.dataset.hold !== undefined) {
     // Press/release pair: quick tap acts like a click, holding repeats.
-    let down = false;
-    const release = () => { if (down) { down = false; sendKey(key, 'END_LONG'); } };
+    let downAt = 0;
+    const release = async () => {
+      if (!downAt) return;
+      const held = Date.now() - downAt;
+      downAt = 0;
+      if (held < MIN_PRESS_MS) await sleep(MIN_PRESS_MS - held);
+      sendKey(key, 'END_LONG');
+    };
     b.addEventListener('pointerdown', e => {
-      e.preventDefault(); down = true; sendKey(key, 'START_LONG');
+      e.preventDefault();
+      if (downAt) return;  // debounce double-fire
+      downAt = Date.now();
+      sendKey(key, 'START_LONG');
     });
     b.addEventListener('pointerup', release);
     b.addEventListener('pointercancel', release);
     b.addEventListener('pointerleave', release);
     b.addEventListener('contextmenu', e => e.preventDefault());
   } else if (b.dataset.tapPair !== undefined) {
-    // Keys the TV ignores as SHORT (volume group): send press+release.
-    b.onclick = async () => { await sendKey(key, 'START_LONG'); sendKey(key, 'END_LONG'); };
+    // Keys the TV ignores as SHORT (volume group): press, hold MIN_PRESS_MS,
+    // release. Guard against re-entry while the pair is in flight.
+    let busy = false;
+    b.onclick = async () => {
+      if (busy) return;
+      busy = true;
+      sendKey(key, 'START_LONG');
+      await sleep(MIN_PRESS_MS);
+      await sendKey(key, 'END_LONG');
+      busy = false;
+    };
   } else {
     b.onclick = () => sendKey(key);
   }
