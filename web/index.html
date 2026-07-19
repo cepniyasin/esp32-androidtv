@@ -2,85 +2,231 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Android TV Remote</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101418">
+<title>TV Remote</title>
 <style>
-  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { color-scheme: dark; }
   body {
-    font-family: system-ui, sans-serif;
-    display: flex; flex-direction: column; align-items: center;
-    justify-content: center; min-height: 100vh; margin: 0; gap: 1rem;
+    font-family: system-ui, -apple-system, sans-serif;
+    background: linear-gradient(180deg, #15191f 0%, #0c0f13 100%);
+    color: #e8eaed;
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; justify-content: center;
+    padding: max(env(safe-area-inset-top), 12px) 16px
+             max(env(safe-area-inset-bottom), 16px);
   }
-  #status { font-size: 0.9rem; opacity: 0.7; }
-  #pair { display: none; flex-direction: column; align-items: center; gap: 0.5rem; }
-  #pair.visible { display: flex; }
-  #code { font-size: 1.4rem; width: 8ch; text-align: center;
-          text-transform: uppercase; letter-spacing: 0.2ch; }
-  #pairmsg { font-size: 0.9rem; min-height: 1.2em; }
-  #keys { display: none; grid-template-columns: repeat(3, 4.5rem); gap: 0.4rem; }
-  #keys.visible { display: grid; }
+  #remote {
+    width: 100%; max-width: 340px;
+    display: flex; flex-direction: column; gap: 18px;
+  }
   button {
+    font: inherit; color: inherit; border: none; cursor: pointer;
+    background: #232a33; border-radius: 14px;
     touch-action: manipulation;
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-touch-callout: none;         /* no iOS long-press callout */
-    -webkit-tap-highlight-color: transparent;  /* no Android tap flash */
+    user-select: none; -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.12s, transform 0.06s;
   }
-  #keys button { padding: 0.8rem 0; font-size: 0.9rem; }
-  #keys button.nosupport { opacity: 0.35; }
+  button:active { background: #313b47; transform: scale(0.96); }
+  button.nosupport { opacity: 0.3; pointer-events: none; }
+
+  /* top bar */
+  #topbar { display: flex; align-items: center; justify-content: space-between; }
+  #statusdot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #f28b82; display: inline-block; margin-right: 8px;
+    transition: background 0.3s;
+  }
+  #statusdot.on { background: #81c995; }
+  #statusline { font-size: 0.8rem; color: #9aa0a6; display: flex; align-items: center; }
+  #power {
+    width: 52px; height: 52px; border-radius: 50%;
+    font-size: 1.25rem; color: #f28b82; background: #2a2229;
+  }
+  #power:active { background: #3d2e35; }
+
+  /* d-pad */
+  #dpad {
+    position: relative; width: 240px; height: 240px;
+    margin: 0 auto; border-radius: 50%; background: #1b2129;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.35);
+    overflow: hidden;
+  }
+  #dpad button { position: absolute; background: transparent; border-radius: 0; font-size: 1.05rem; color: #bdc1c6; }
+  #dpad button:active { background: rgba(255,255,255,0.07); transform: none; }
+  #d-up    { top: 0;    left: 25%; width: 50%; height: 33%; }
+  #d-down  { bottom: 0; left: 25%; width: 50%; height: 33%; }
+  #d-left  { left: 0;   top: 25%;  width: 33%; height: 50%; }
+  #d-right { right: 0;  top: 25%;  width: 33%; height: 50%; }
+  #d-ok {
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 96px; height: 96px; border-radius: 50%;
+    background: #2c3540; font-weight: 600; letter-spacing: 0.06em;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+  }
+  #d-ok:active { background: #3a4652; transform: translate(-50%, -50%) scale(0.96); }
+
+  /* rows */
+  .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .row button { height: 56px; font-size: 1.15rem; color: #bdc1c6; }
+
+  /* app shortcuts */
+  #apps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  #apps button { height: 52px; font-weight: 700; font-size: 0.95rem; letter-spacing: 0.02em; }
+  #app-netflix { background: #2a1a1c; color: #e50914; }
+  #app-netflix:active { background: #3c2225; }
+  #app-youtube { background: #2a1e1c; color: #ff4e45; }
+  #app-youtube:active { background: #3c2a26; }
+
+  /* pairing */
+  #pair {
+    display: none; flex-direction: column; align-items: center; gap: 10px;
+    background: #1b2129; border-radius: 16px; padding: 18px;
+  }
+  #pair.visible { display: flex; }
+  #pair p { font-size: 0.9rem; color: #9aa0a6; }
+  #code {
+    font: inherit; font-size: 1.4rem; width: 9ch; text-align: center;
+    text-transform: uppercase; letter-spacing: 0.25ch;
+    background: #10151b; color: #e8eaed;
+    border: 1px solid #333b45; border-radius: 10px; padding: 8px;
+  }
+  #pair button { padding: 10px 26px; background: #8ab4f8; color: #10151b; font-weight: 600; }
+  #pairmsg { font-size: 0.85rem; min-height: 1.1em; color: #9aa0a6; }
 </style>
 </head>
 <body>
-<h1>Android TV Remote</h1>
-<p id="status">checking status…</p>
-<div id="pair">
-  <p>Enter the code shown on the TV:</p>
-  <input id="code" maxlength="6" autocomplete="off" spellcheck="false" placeholder="A1B2C3">
-  <button id="send">Pair</button>
-  <p id="pairmsg"></p>
+<div id="remote">
+  <div id="topbar">
+    <span id="statusline"><span id="statusdot"></span><span id="statustext">connecting…</span></span>
+    <button id="power" data-key="POWER" aria-label="Power">⏻</button>
+  </div>
+
+  <div id="pair">
+    <p>Enter the code shown on the TV</p>
+    <input id="code" maxlength="6" autocomplete="off" spellcheck="false" placeholder="A1B2C3">
+    <button id="send">Pair</button>
+    <p id="pairmsg"></p>
+  </div>
+
+  <div id="dpad">
+    <button id="d-up"    data-key="DPAD_UP"     data-hold aria-label="Up">▲</button>
+    <button id="d-left"  data-key="DPAD_LEFT"   data-hold aria-label="Left">◀</button>
+    <button id="d-ok"    data-key="DPAD_CENTER" aria-label="OK">OK</button>
+    <button id="d-right" data-key="DPAD_RIGHT"  data-hold aria-label="Right">▶</button>
+    <button id="d-down"  data-key="DPAD_DOWN"   data-hold aria-label="Down">▼</button>
+  </div>
+
+  <div class="row">
+    <button data-key="BACK" aria-label="Back">←</button>
+    <button data-key="HOME" aria-label="Home">⌂</button>
+    <button data-key="MEDIA_PLAY_PAUSE" aria-label="Play/Pause">⏯</button>
+  </div>
+
+  <div class="row">
+    <button data-key="VOLUME_DOWN" data-hold data-vol aria-label="Volume down">−</button>
+    <button data-key="VOLUME_MUTE" data-vol aria-label="Mute">🔇</button>
+    <button data-key="VOLUME_UP" data-hold data-vol aria-label="Volume up">+</button>
+  </div>
+
+  <div id="apps">
+    <button id="app-netflix" data-link="netflix://home">NETFLIX</button>
+    <button id="app-youtube" data-link="https://www.youtube.com/tv">YouTube</button>
+  </div>
 </div>
-<!-- Debug buttons for Phase 6; real layout comes in Phase 7.
-     data-hold buttons send START_LONG on press / END_LONG on release
-     (required for volume on Chromecast; enables hold-to-repeat). -->
-<div id="keys">
-  <button data-key="POWER">⏻</button>
-  <button data-key="DPAD_UP" data-hold>▲</button>
-  <button data-key="BACK">←</button>
-  <button data-key="DPAD_LEFT" data-hold>◀</button>
-  <button data-key="DPAD_CENTER">OK</button>
-  <button data-key="DPAD_RIGHT" data-hold>▶</button>
-  <button data-key="HOME">⌂</button>
-  <button data-key="DPAD_DOWN" data-hold>▼</button>
-  <button data-key="MEDIA_PLAY_PAUSE">⏯</button>
-  <button data-key="VOLUME_DOWN" data-hold data-vol>V−</button>
-  <button data-key="VOLUME_MUTE" data-vol>🔇</button>
-  <button data-key="VOLUME_UP" data-hold data-vol>V+</button>
-</div>
+
 <script>
-const statusEl = document.getElementById('status');
+const statusText = document.getElementById('statustext');
+const statusDot = document.getElementById('statusdot');
 const pairEl = document.getElementById('pair');
 const msgEl = document.getElementById('pairmsg');
 let pairing = false;
+let holding = false;
+
+// All key sends go through one promise chain: parallel fetches can arrive
+// out of order, and a release overtaking its press breaks the key.
+let keyChain = Promise.resolve();
+function post(url, body) {
+  keyChain = keyChain
+    .then(() => fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    }))
+    .catch(() => {});
+  return keyChain;
+}
+const sendKey = (key, direction = 'SHORT') => post('/api/key', {key, direction});
+
+// A press shorter than this is a tap (single SHORT). Only a real hold
+// sends the START_LONG/END_LONG pair — rapid long-press pairs make the
+// Chromecast close the control connection.
+const HOLD_THRESHOLD_MS = 300;
 
 async function poll() {
   if (pairing || holding) return;
   try {
     const s = await (await fetch('/api/status')).json();
-    statusEl.textContent =
-      `state: ${s.state} · paired: ${s.paired} · connected: ${s.connected}`;
+    statusDot.classList.toggle('on', s.connected);
+    statusText.textContent = s.connected ? 'connected'
+      : s.state === 'wait_code' ? 'pairing'
+      : s.state.replace('_', ' ');
     pairEl.classList.toggle('visible', s.state === 'wait_code');
-    document.getElementById('keys').classList.toggle('visible', s.connected);
     // max == 0: the device delegates volume to the TV over CEC; the
-    // protocol cannot change it, so mark those buttons unsupported.
+    // protocol cannot change it.
     const volOk = s.volume && s.volume.max > 0;
     document.querySelectorAll('[data-vol]').forEach(v => {
       v.classList.toggle('nosupport', !volOk);
-      v.title = volOk ? '' : 'volume not controllable on this device';
     });
   } catch (e) {
-    statusEl.textContent = 'esp32 unreachable';
+    statusDot.classList.remove('on');
+    statusText.textContent = 'unreachable';
   }
 }
+
+document.querySelectorAll('[data-key]').forEach(b => {
+  const key = b.dataset.key;
+  if (b.dataset.hold !== undefined) {
+    let down = false;
+    let longActive = false;
+    let holdTimer = null;
+    const release = () => {
+      if (!down) return;
+      down = false;
+      holding = false;
+      clearTimeout(holdTimer);
+      if (longActive) {
+        longActive = false;
+        sendKey(key, 'END_LONG');
+      } else {
+        sendKey(key, 'SHORT');
+      }
+    };
+    b.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      if (down) return;
+      b.setPointerCapture(e.pointerId);
+      down = true;
+      holding = true;
+      holdTimer = setTimeout(() => {
+        longActive = true;
+        sendKey(key, 'START_LONG');
+      }, HOLD_THRESHOLD_MS);
+    });
+    b.addEventListener('pointerup', release);
+    b.addEventListener('pointercancel', release);
+    b.addEventListener('contextmenu', e => e.preventDefault());
+  } else {
+    b.onclick = () => sendKey(key);
+  }
+});
+
+document.querySelectorAll('[data-link]').forEach(b => {
+  b.onclick = () => post('/api/app', {link: b.dataset.link});
+});
 
 document.getElementById('send').onclick = async () => {
   const code = document.getElementById('code').value.trim().toUpperCase();
@@ -104,70 +250,8 @@ document.getElementById('send').onclick = async () => {
   poll();
 };
 
-// All key sends go through one promise chain: two parallel fetches can
-// arrive out of order (separate connections), and a release overtaking
-// its press makes the TV drop the key entirely.
-let keyChain = Promise.resolve();
-function sendKey(key, direction = 'SHORT') {
-  keyChain = keyChain
-    .then(() => fetch('/api/key', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({key, direction}),
-    }))
-    .catch(() => {});
-  return keyChain;
-}
-
-// A press shorter than this is a tap (single SHORT). Only a real hold
-// sends the START_LONG/END_LONG pair — rapid long-press pairs make the
-// Chromecast close the control connection.
-const HOLD_THRESHOLD_MS = 300;
-let holding = false;  // suppress status polling during a hold
-
-document.querySelectorAll('#keys button').forEach(b => {
-  const key = b.dataset.key;
-  if (b.dataset.hold !== undefined) {
-    // Tap -> single SHORT. Held past the threshold -> START_LONG, then
-    // END_LONG on release (auto-repeat happens on the TV).
-    let down = false;
-    let longActive = false;
-    let holdTimer = null;
-    const release = () => {
-      if (!down) return;
-      down = false;
-      holding = false;
-      clearTimeout(holdTimer);
-      if (longActive) {
-        longActive = false;
-        sendKey(key, 'END_LONG');
-      } else {
-        sendKey(key, 'SHORT');
-      }
-    };
-    b.addEventListener('pointerdown', e => {
-      e.preventDefault();
-      if (down) return;  // debounce double-fire
-      // Capture the pointer so finger drift off the button doesn't end
-      // the hold (pointerleave would otherwise fire mid-hold).
-      b.setPointerCapture(e.pointerId);
-      down = true;
-      holding = true;
-      holdTimer = setTimeout(() => {
-        longActive = true;
-        sendKey(key, 'START_LONG');
-      }, HOLD_THRESHOLD_MS);
-    });
-    b.addEventListener('pointerup', release);
-    b.addEventListener('pointercancel', release);
-    b.addEventListener('contextmenu', e => e.preventDefault());
-  } else {
-    b.onclick = () => sendKey(key);
-  }
-});
-
 poll();
-setInterval(poll, 2000);
+setInterval(poll, 2500);
 </script>
 </body>
 </html>

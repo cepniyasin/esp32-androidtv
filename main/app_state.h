@@ -49,6 +49,10 @@ typedef struct {
 } key_cmd_t;
 extern QueueHandle_t g_key_queue;
 
+// App deep links for RemoteAppLinkLaunchRequest (e.g. "netflix://home").
+#define APP_LINK_MAX 128
+extern QueueHandle_t g_app_queue;  // item: char[APP_LINK_MAX]
+
 void app_state_init(void);
 
 const char *atv_state_str(atv_state_t s);

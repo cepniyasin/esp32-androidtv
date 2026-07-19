@@ -149,6 +149,32 @@ static esp_err_t key_post_handler(httpd_req_t *req)
     return httpd_resp_sendstr(req, "{\"ok\":true}");
 }
 
+// Accepts {"link":"netflix://home"}; queues an app launch.
+static esp_err_t app_post_handler(httpd_req_t *req)
+{
+    char body[192] = {0};
+    int received = httpd_req_recv(req, body, sizeof(body) - 1);
+    if (received <= 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "empty body");
+        return ESP_FAIL;
+    }
+    char link[APP_LINK_MAX] = {0};
+    if (!json_get_str(body, "link", link, sizeof(link)) || link[0] == '\0') {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing link");
+        return ESP_FAIL;
+    }
+    if (!g_atv_status.connected) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "not connected to the TV");
+        return ESP_FAIL;
+    }
+    if (xQueueSend(g_app_queue, link, 0) != pdTRUE) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "queue full");
+        return ESP_FAIL;
+    }
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, "{\"ok\":true}");
+}
+
 static esp_err_t mdns_start(void)
 {
     ESP_ERROR_CHECK(mdns_init());
@@ -185,10 +211,14 @@ esp_err_t webserver_start(void)
     static const httpd_uri_t key_uri = {
         .uri = "/api/key", .method = HTTP_POST, .handler = key_post_handler
     };
+    static const httpd_uri_t app_uri = {
+        .uri = "/api/app", .method = HTTP_POST, .handler = app_post_handler
+    };
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &index_uri));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &status_uri));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &pair_uri));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &key_uri));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &app_uri));
 
     ESP_LOGI(TAG, "Web UI at http://androidtv-remote.local/ (port 80)");
     return ESP_OK;

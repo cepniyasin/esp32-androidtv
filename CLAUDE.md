@@ -58,5 +58,5 @@ Facts already verified against `pairing.py` / `remote.py` (v2 protocol):
 - [x] Phase 4 — pairing state machine + secret (live-paired with the Chromecast HD via the web form). NOTE: if `tools/gen_cert.sh` ever regenerates the cert, rerun `test/gen_pairing_oracle.py` — `test/golden_pairing.inc` is derived from the local client cert.
 - [x] Phase 5 — control channel + keepalive (verified: stays connected, auto-reconnects)
 - [x] Phase 6 — key injection (verified: web buttons drive the TV)
-- [ ] Phase 7 — web UI polish
+- [ ] Phase 7 — web UI polish (remote layout + Netflix/YouTube app links via `POST /api/app` done; awaiting on-phone verification)
 - [ ] Phase 8 — robustness

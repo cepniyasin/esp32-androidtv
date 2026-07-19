@@ -195,6 +195,17 @@ esp_err_t remote_session(atv_tls_t *tls)
                 // back-to-back faster than a human remote could send them.
                 vTaskDelay(pdMS_TO_TICKS(50));
             }
+            char link[APP_LINK_MAX];
+            while (g_app_queue && xQueueReceive(g_app_queue, link, 0) == pdTRUE) {
+                remote_RemoteMessage m = remote_RemoteMessage_init_zero;
+                m.has_remote_app_link_launch_request = true;
+                strlcpy(m.remote_app_link_launch_request.app_link, link,
+                        sizeof(m.remote_app_link_launch_request.app_link));
+                ESP_LOGI(TAG, "launching app link: %s", link);
+                if (send_msg(tls, &m) != ESP_OK) {
+                    return ESP_FAIL;
+                }
+            }
             int64_t now = esp_timer_get_time();
             if (probe_outstanding) {
                 if ((now - probe_sent_us) / 1000 > PING_REPLY_MS) {
