@@ -214,6 +214,9 @@ const sendKey = (key, direction = 'SHORT') => post('/api/key', {key, direction})
 // Chromecast close the control connection.
 const HOLD_THRESHOLD_MS = 300;
 
+// Poll slowly while connected and stable; speed up only when things are
+// changing (pairing, reconnecting, unreachable).
+let pollDelay = 3000;
 async function poll() {
   if (pairing || holding) return;
   try {
@@ -229,9 +232,11 @@ async function poll() {
     document.querySelectorAll('[data-vol]').forEach(v => {
       v.classList.toggle('nosupport', !volOk);
     });
+    pollDelay = s.connected ? 15000 : 3000;
   } catch (e) {
     statusDot.classList.remove('on');
     statusText.textContent = 'unreachable';
+    pollDelay = 3000;
   }
 }
 
@@ -298,8 +303,10 @@ document.getElementById('send').onclick = async () => {
   poll();
 };
 
-poll();
-setInterval(poll, 2500);
+(async function pollLoop() {
+  await poll();
+  setTimeout(pollLoop, pollDelay);
+})();
 </script>
 </body>
 </html>
