@@ -8,6 +8,7 @@
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "mdns.h"
+#include "remote.h"
 
 static const char *TAG = "webserver";
 
@@ -81,6 +82,49 @@ static esp_err_t pair_post_handler(httpd_req_t *req)
     return httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"pairing failed - check the code\"}");
 }
 
+// Accepts {"key":"DPAD_UP"} (any TvKeys.txt name); queues it for the
+// TV-session task.
+static esp_err_t key_post_handler(httpd_req_t *req)
+{
+    char body[96] = {0};
+    int received = httpd_req_recv(req, body, sizeof(body) - 1);
+    if (received <= 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "empty body");
+        return ESP_FAIL;
+    }
+    // Pull the value of "key" out of the JSON without a parser: find the
+    // colon after "key" and take the next quoted token.
+    char name[40] = {0};
+    const char *p = strstr(body, "\"key\"");
+    if (p != NULL) {
+        p = strchr(p + 5, ':');
+    }
+    if (p != NULL) {
+        p = strchr(p, '"');
+    }
+    if (p != NULL) {
+        const char *end = strchr(p + 1, '"');
+        if (end != NULL && (size_t)(end - p - 1) < sizeof(name)) {
+            memcpy(name, p + 1, (size_t)(end - p - 1));
+        }
+    }
+    int code = name[0] ? remote_key_from_name(name) : -1;
+    if (code < 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "unknown key");
+        return ESP_FAIL;
+    }
+    if (!g_atv_status.connected) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "not connected to the TV");
+        return ESP_FAIL;
+    }
+    if (xQueueSend(g_key_queue, &code, 0) != pdTRUE) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "key queue full");
+        return ESP_FAIL;
+    }
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, "{\"ok\":true}");
+}
+
 static esp_err_t mdns_start(void)
 {
     ESP_ERROR_CHECK(mdns_init());
@@ -111,9 +155,13 @@ esp_err_t webserver_start(void)
     static const httpd_uri_t pair_uri = {
         .uri = "/api/pair", .method = HTTP_POST, .handler = pair_post_handler
     };
+    static const httpd_uri_t key_uri = {
+        .uri = "/api/key", .method = HTTP_POST, .handler = key_post_handler
+    };
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &index_uri));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &status_uri));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &pair_uri));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &key_uri));
 
     ESP_LOGI(TAG, "Web UI at http://androidtv-remote.local/ (port 80)");
     return ESP_OK;

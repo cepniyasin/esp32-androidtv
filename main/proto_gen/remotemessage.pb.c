@@ -72,7 +72,7 @@ PB_BIND(remote_RemoteDeviceInfo, remote_RemoteDeviceInfo, AUTO)
 PB_BIND(remote_RemoteConfigure, remote_RemoteConfigure, AUTO)
 
 
-PB_BIND(remote_RemoteError, remote_RemoteError, 2)
+PB_BIND(remote_RemoteError, remote_RemoteError, AUTO)
 
 
 PB_BIND(remote_RemoteMessage, remote_RemoteMessage, 2)

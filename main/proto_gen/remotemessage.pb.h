@@ -895,32 +895,49 @@ typedef struct _remote_RemoteConfigure {
     remote_RemoteDeviceInfo device_info;
 } remote_RemoteConfigure;
 
-typedef struct _remote_RemoteMessage {
-    pb_callback_t remote_configure;
-    pb_callback_t remote_set_active;
-    pb_callback_t remote_error;
-    pb_callback_t remote_ping_request;
-    pb_callback_t remote_ping_response;
-    pb_callback_t remote_key_inject;
-    pb_callback_t remote_ime_key_inject;
-    pb_callback_t remote_ime_batch_edit;
-    pb_callback_t remote_ime_show_request;
-    pb_callback_t remote_voice_begin;
-    pb_callback_t remote_voice_payload;
-    pb_callback_t remote_voice_end;
-    pb_callback_t remote_start;
-    pb_callback_t remote_set_volume_level;
-    pb_callback_t remote_adjust_volume_level;
-    pb_callback_t remote_set_preferred_audio_device;
-    pb_callback_t remote_reset_preferred_audio_device;
-    pb_callback_t remote_app_link_launch_request;
-} remote_RemoteMessage;
-
 typedef struct _remote_RemoteError {
     bool value;
-    bool has_message;
-    remote_RemoteMessage message;
+    pb_callback_t message;
 } remote_RemoteError;
+
+typedef struct _remote_RemoteMessage {
+    bool has_remote_configure;
+    remote_RemoteConfigure remote_configure;
+    bool has_remote_set_active;
+    remote_RemoteSetActive remote_set_active;
+    bool has_remote_error;
+    remote_RemoteError remote_error;
+    bool has_remote_ping_request;
+    remote_RemotePingRequest remote_ping_request;
+    bool has_remote_ping_response;
+    remote_RemotePingResponse remote_ping_response;
+    bool has_remote_key_inject;
+    remote_RemoteKeyInject remote_key_inject;
+    bool has_remote_ime_key_inject;
+    remote_RemoteImeKeyInject remote_ime_key_inject;
+    bool has_remote_ime_batch_edit;
+    remote_RemoteImeBatchEdit remote_ime_batch_edit;
+    bool has_remote_ime_show_request;
+    remote_RemoteImeShowRequest remote_ime_show_request;
+    bool has_remote_voice_begin;
+    remote_RemoteVoiceBegin remote_voice_begin;
+    bool has_remote_voice_payload;
+    remote_RemoteVoicePayload remote_voice_payload;
+    bool has_remote_voice_end;
+    remote_RemoteVoiceEnd remote_voice_end;
+    bool has_remote_start;
+    remote_RemoteStart remote_start;
+    bool has_remote_set_volume_level;
+    remote_RemoteSetVolumeLevel remote_set_volume_level;
+    bool has_remote_adjust_volume_level;
+    remote_RemoteAdjustVolumeLevel remote_adjust_volume_level;
+    bool has_remote_set_preferred_audio_device;
+    remote_RemoteSetPreferredAudioDevice remote_set_preferred_audio_device;
+    bool has_remote_reset_preferred_audio_device;
+    remote_RemoteResetPreferredAudioDevice remote_reset_preferred_audio_device;
+    bool has_remote_app_link_launch_request;
+    remote_RemoteAppLinkLaunchRequest remote_app_link_launch_request;
+} remote_RemoteMessage;
 
 
 #ifdef __cplusplus
@@ -986,8 +1003,8 @@ extern "C" {
 #define remote_RemoteSetActive_init_default      {0}
 #define remote_RemoteDeviceInfo_init_default     {"", "", 0, "", "", ""}
 #define remote_RemoteConfigure_init_default      {0, false, remote_RemoteDeviceInfo_init_default}
-#define remote_RemoteError_init_default          {0, false, remote_RemoteMessage_init_default}
-#define remote_RemoteMessage_init_default        {{{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}}
+#define remote_RemoteError_init_default          {0, {{NULL}, NULL}}
+#define remote_RemoteMessage_init_default        {false, remote_RemoteConfigure_init_default, false, remote_RemoteSetActive_init_default, false, remote_RemoteError_init_default, false, remote_RemotePingRequest_init_default, false, remote_RemotePingResponse_init_default, false, remote_RemoteKeyInject_init_default, false, remote_RemoteImeKeyInject_init_default, false, remote_RemoteImeBatchEdit_init_default, false, remote_RemoteImeShowRequest_init_default, false, remote_RemoteVoiceBegin_init_default, false, remote_RemoteVoicePayload_init_default, false, remote_RemoteVoiceEnd_init_default, false, remote_RemoteStart_init_default, false, remote_RemoteSetVolumeLevel_init_default, false, remote_RemoteAdjustVolumeLevel_init_default, false, remote_RemoteSetPreferredAudioDevice_init_default, false, remote_RemoteResetPreferredAudioDevice_init_default, false, remote_RemoteAppLinkLaunchRequest_init_default}
 #define remote_RemoteAppLinkLaunchRequest_init_zero {""}
 #define remote_RemoteResetPreferredAudioDevice_init_zero {0}
 #define remote_RemoteSetPreferredAudioDevice_init_zero {0}
@@ -1010,8 +1027,8 @@ extern "C" {
 #define remote_RemoteSetActive_init_zero         {0}
 #define remote_RemoteDeviceInfo_init_zero        {"", "", 0, "", "", ""}
 #define remote_RemoteConfigure_init_zero         {0, false, remote_RemoteDeviceInfo_init_zero}
-#define remote_RemoteError_init_zero             {0, false, remote_RemoteMessage_init_zero}
-#define remote_RemoteMessage_init_zero           {{{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}}
+#define remote_RemoteError_init_zero             {0, {{NULL}, NULL}}
+#define remote_RemoteMessage_init_zero           {false, remote_RemoteConfigure_init_zero, false, remote_RemoteSetActive_init_zero, false, remote_RemoteError_init_zero, false, remote_RemotePingRequest_init_zero, false, remote_RemotePingResponse_init_zero, false, remote_RemoteKeyInject_init_zero, false, remote_RemoteImeKeyInject_init_zero, false, remote_RemoteImeBatchEdit_init_zero, false, remote_RemoteImeShowRequest_init_zero, false, remote_RemoteVoiceBegin_init_zero, false, remote_RemoteVoicePayload_init_zero, false, remote_RemoteVoiceEnd_init_zero, false, remote_RemoteStart_init_zero, false, remote_RemoteSetVolumeLevel_init_zero, false, remote_RemoteAdjustVolumeLevel_init_zero, false, remote_RemoteSetPreferredAudioDevice_init_zero, false, remote_RemoteResetPreferredAudioDevice_init_zero, false, remote_RemoteAppLinkLaunchRequest_init_zero}
 
 /* Field tags (for use in manual encoding/decoding) */
 #define remote_RemoteAppLinkLaunchRequest_app_link_tag 1
@@ -1069,6 +1086,8 @@ extern "C" {
 #define remote_RemoteDeviceInfo_app_version_tag  6
 #define remote_RemoteConfigure_code1_tag         1
 #define remote_RemoteConfigure_device_info_tag   2
+#define remote_RemoteError_value_tag             1
+#define remote_RemoteError_message_tag           2
 #define remote_RemoteMessage_remote_configure_tag 1
 #define remote_RemoteMessage_remote_set_active_tag 2
 #define remote_RemoteMessage_remote_error_tag    3
@@ -1087,8 +1106,6 @@ extern "C" {
 #define remote_RemoteMessage_remote_set_preferred_audio_device_tag 60
 #define remote_RemoteMessage_remote_reset_preferred_audio_device_tag 61
 #define remote_RemoteMessage_remote_app_link_launch_request_tag 90
-#define remote_RemoteError_value_tag             1
-#define remote_RemoteError_message_tag           2
 
 /* Struct field encoding specification for nanopb */
 #define remote_RemoteAppLinkLaunchRequest_FIELDLIST(X, a) \
@@ -1245,31 +1262,31 @@ X(a, STATIC,   OPTIONAL, MESSAGE,  device_info,       2)
 
 #define remote_RemoteError_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, BOOL,     value,             1) \
-X(a, STATIC,   OPTIONAL, MESSAGE,  message,           2)
-#define remote_RemoteError_CALLBACK NULL
+X(a, CALLBACK, OPTIONAL, MESSAGE,  message,           2)
+#define remote_RemoteError_CALLBACK pb_default_field_callback
 #define remote_RemoteError_DEFAULT NULL
 #define remote_RemoteError_message_MSGTYPE remote_RemoteMessage
 
 #define remote_RemoteMessage_FIELDLIST(X, a) \
-X(a, CALLBACK, OPTIONAL, MESSAGE,  remote_configure,   1) \
-X(a, CALLBACK, OPTIONAL, MESSAGE,  remote_set_active,   2) \
-X(a, CALLBACK, OPTIONAL, MESSAGE,  remote_error,      3) \
-X(a, CALLBACK, OPTIONAL, MESSAGE,  remote_ping_request,   8) \
-X(a, CALLBACK, OPTIONAL, MESSAGE,  remote_ping_response,   9) \
-X(a, CALLBACK, OPTIONAL, MESSAGE,  remote_key_inject,  10) \
-X(a, CALLBACK, OPTIONAL, MESSAGE,  remote_ime_key_inject,  20) \
-X(a, CALLBACK, OPTIONAL, MESSAGE,  remote_ime_batch_edit,  21) \
-X(a, CALLBACK, OPTIONAL, MESSAGE,  remote_ime_show_request,  22) \
-X(a, CALLBACK, OPTIONAL, MESSAGE,  remote_voice_begin,  30) \
-X(a, CALLBACK, OPTIONAL, MESSAGE,  remote_voice_payload,  31) \
-X(a, CALLBACK, OPTIONAL, MESSAGE,  remote_voice_end,  32) \
-X(a, CALLBACK, OPTIONAL, MESSAGE,  remote_start,     40) \
-X(a, CALLBACK, OPTIONAL, MESSAGE,  remote_set_volume_level,  50) \
-X(a, CALLBACK, OPTIONAL, MESSAGE,  remote_adjust_volume_level,  51) \
-X(a, CALLBACK, OPTIONAL, MESSAGE,  remote_set_preferred_audio_device,  60) \
-X(a, CALLBACK, OPTIONAL, MESSAGE,  remote_reset_preferred_audio_device,  61) \
-X(a, CALLBACK, OPTIONAL, MESSAGE,  remote_app_link_launch_request,  90)
-#define remote_RemoteMessage_CALLBACK pb_default_field_callback
+X(a, STATIC,   OPTIONAL, MESSAGE,  remote_configure,   1) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  remote_set_active,   2) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  remote_error,      3) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  remote_ping_request,   8) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  remote_ping_response,   9) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  remote_key_inject,  10) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  remote_ime_key_inject,  20) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  remote_ime_batch_edit,  21) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  remote_ime_show_request,  22) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  remote_voice_begin,  30) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  remote_voice_payload,  31) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  remote_voice_end,  32) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  remote_start,     40) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  remote_set_volume_level,  50) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  remote_adjust_volume_level,  51) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  remote_set_preferred_audio_device,  60) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  remote_reset_preferred_audio_device,  61) \
+X(a, STATIC,   OPTIONAL, MESSAGE,  remote_app_link_launch_request,  90)
+#define remote_RemoteMessage_CALLBACK NULL
 #define remote_RemoteMessage_DEFAULT NULL
 #define remote_RemoteMessage_remote_configure_MSGTYPE remote_RemoteConfigure
 #define remote_RemoteMessage_remote_set_active_MSGTYPE remote_RemoteSetActive

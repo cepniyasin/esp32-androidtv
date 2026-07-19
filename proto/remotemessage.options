@@ -3,6 +3,9 @@
 remote.RemoteAppLinkLaunchRequest.app_link      max_size:128
 remote.RemoteSetVolumeLevel.player_model        max_size:64
 remote.RemoteVoicePayload.samples               type:FT_CALLBACK
+# Break the RemoteError <-> RemoteMessage cycle here so RemoteMessage
+# itself stays a plain static struct.
+remote.RemoteError.message                      type:FT_CALLBACK
 remote.RemoteVoiceBegin.package_name            max_size:64
 remote.RemoteTextFieldStatus.value              max_size:128
 remote.RemoteTextFieldStatus.label              max_size:64

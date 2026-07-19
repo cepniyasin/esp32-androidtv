@@ -3,11 +3,13 @@
 atv_status_t g_atv_status;
 QueueHandle_t g_pair_code_queue;
 EventGroupHandle_t g_pair_events;
+QueueHandle_t g_key_queue;
 
 void app_state_init(void)
 {
     g_pair_code_queue = xQueueCreate(1, PAIR_CODE_LEN + 1);
     g_pair_events = xEventGroupCreate();
+    g_key_queue = xQueueCreate(8, sizeof(int));
     g_atv_status.state = ATV_STATE_BOOT;
 }
 

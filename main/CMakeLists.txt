@@ -7,6 +7,7 @@ idf_component_register(
          "app_state.c"
          "pairing.c"
          "store.c"
+         "remote.c"
          "proto_gen/polo.pb.c"
          "proto_gen/remotemessage.pb.c"
     INCLUDE_DIRS "." "proto_gen"

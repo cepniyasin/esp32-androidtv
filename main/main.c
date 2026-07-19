@@ -7,6 +7,7 @@
 #include "net_tls.h"
 #include "nvs_flash.h"
 #include "pairing.h"
+#include "remote.h"
 #include "store.h"
 #include "webserver.h"
 #include "pb_decode.h"
@@ -60,8 +61,8 @@ static bool code_from_web(char code[7], void *ctx)
     return xQueueReceive(g_pair_code_queue, code, pdMS_TO_TICKS(180000)) == pdTRUE;
 }
 
-// Owns all TV-facing I/O (PLAN.md §4.5): pairs if needed, then (Phase 5)
-// will run the control channel. Separate task: TLS needs the stack.
+// Owns all TV-facing I/O (PLAN.md §4.5): pairs if needed, then runs the
+// control channel with auto-reconnect. Separate task: TLS needs the stack.
 static void tv_session_task(void *arg)
 {
     (void)arg;
@@ -89,8 +90,24 @@ static void tv_session_task(void *arg)
             vTaskDelay(pdMS_TO_TICKS(2000));
         }
     }
-    // Phase 5 will connect to the control port here.
-    vTaskDelete(NULL);
+
+    // Control channel with reconnect + backoff.
+    uint32_t backoff_ms = 1000;
+    while (true) {
+        atv_tls_t tls;
+        if (atv_tls_connect(&tls, CONFIG_ATV_TV_IP, 6466) == ESP_OK) {
+            backoff_ms = 1000;
+            remote_session(&tls);
+            atv_tls_close(&tls);
+        }
+        g_atv_status.connected = false;
+        g_atv_status.state = ATV_STATE_PAIRED;
+        ESP_LOGW(TAG, "Control channel down; reconnecting in %u ms", (unsigned)backoff_ms);
+        vTaskDelay(pdMS_TO_TICKS(backoff_ms));
+        if (backoff_ms < 30000) {
+            backoff_ms *= 2;
+        }
+    }
 }
 
 void app_main(void)
@@ -119,8 +136,6 @@ void app_main(void)
 
     if (g_atv_status.paired) {
         g_atv_status.state = ATV_STATE_PAIRED;
-        ESP_LOGI(TAG, "Already paired; control channel comes in Phase 5.");
-    } else {
-        xTaskCreate(tv_session_task, "tv_session", 10240, NULL, 5, NULL);
     }
+    xTaskCreate(tv_session_task, "tv_session", 10240, NULL, 5, NULL);
 }

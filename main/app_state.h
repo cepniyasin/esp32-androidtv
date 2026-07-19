@@ -35,6 +35,9 @@ extern QueueHandle_t g_pair_code_queue;  // item: char[PAIR_CODE_LEN + 1]
 #define PAIR_EVENT_FAIL BIT1
 extern EventGroupHandle_t g_pair_events;
 
+// Key commands for the control channel: int RemoteKeyCode values.
+extern QueueHandle_t g_key_queue;
+
 void app_state_init(void);
 
 const char *atv_state_str(atv_state_t s);
