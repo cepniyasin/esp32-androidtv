@@ -82,42 +82,60 @@ static esp_err_t pair_post_handler(httpd_req_t *req)
     return httpd_resp_sendstr(req, "{\"ok\":false,\"error\":\"pairing failed - check the code\"}");
 }
 
-// Accepts {"key":"DPAD_UP"} (any TvKeys.txt name); queues it for the
-// TV-session task.
+// Pulls the quoted value of a JSON string field out of body without a
+// parser: finds `"field"`, the colon after it, then the next quoted token.
+static bool json_get_str(const char *body, const char *field,
+                         char *out, size_t out_size)
+{
+    char pattern[24];
+    snprintf(pattern, sizeof(pattern), "\"%s\"", field);
+    const char *p = strstr(body, pattern);
+    if (p != NULL) {
+        p = strchr(p + strlen(pattern), ':');
+    }
+    if (p != NULL) {
+        p = strchr(p, '"');
+    }
+    if (p == NULL) {
+        return false;
+    }
+    const char *end = strchr(p + 1, '"');
+    if (end == NULL || (size_t)(end - p - 1) >= out_size) {
+        return false;
+    }
+    memcpy(out, p + 1, (size_t)(end - p - 1));
+    out[end - p - 1] = '\0';
+    return true;
+}
+
+// Accepts {"key":"DPAD_UP","direction":"START_LONG"} (any TvKeys.txt name;
+// direction optional, default SHORT); queues it for the TV-session task.
 static esp_err_t key_post_handler(httpd_req_t *req)
 {
-    char body[96] = {0};
+    char body[128] = {0};
     int received = httpd_req_recv(req, body, sizeof(body) - 1);
     if (received <= 0) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "empty body");
         return ESP_FAIL;
     }
-    // Pull the value of "key" out of the JSON without a parser: find the
-    // colon after "key" and take the next quoted token.
     char name[40] = {0};
-    const char *p = strstr(body, "\"key\"");
-    if (p != NULL) {
-        p = strchr(p + 5, ':');
+    key_cmd_t cmd = {.code = -1, .direction = remote_direction_from_name("SHORT")};
+    if (json_get_str(body, "key", name, sizeof(name))) {
+        cmd.code = remote_key_from_name(name);
     }
-    if (p != NULL) {
-        p = strchr(p, '"');
+    char dir[16] = {0};
+    if (json_get_str(body, "direction", dir, sizeof(dir))) {
+        cmd.direction = remote_direction_from_name(dir);
     }
-    if (p != NULL) {
-        const char *end = strchr(p + 1, '"');
-        if (end != NULL && (size_t)(end - p - 1) < sizeof(name)) {
-            memcpy(name, p + 1, (size_t)(end - p - 1));
-        }
-    }
-    int code = name[0] ? remote_key_from_name(name) : -1;
-    if (code < 0) {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "unknown key");
+    if (cmd.code < 0 || cmd.direction < 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "unknown key or direction");
         return ESP_FAIL;
     }
     if (!g_atv_status.connected) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "not connected to the TV");
         return ESP_FAIL;
     }
-    if (xQueueSend(g_key_queue, &code, 0) != pdTRUE) {
+    if (xQueueSend(g_key_queue, &cmd, 0) != pdTRUE) {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "key queue full");
         return ESP_FAIL;
     }

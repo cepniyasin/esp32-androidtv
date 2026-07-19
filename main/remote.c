@@ -57,6 +57,14 @@ int remote_key_from_name(const char *name)
     return -1;
 }
 
+int remote_direction_from_name(const char *name)
+{
+    if (strcmp(name, "SHORT") == 0) return remote_RemoteDirection_SHORT;
+    if (strcmp(name, "START_LONG") == 0) return remote_RemoteDirection_START_LONG;
+    if (strcmp(name, "END_LONG") == 0) return remote_RemoteDirection_END_LONG;
+    return -1;
+}
+
 // Reads for frame_recv once a frame has started: generous timeout, and
 // hands back the first byte grabbed by the poll loop.
 typedef struct {
@@ -92,12 +100,12 @@ static esp_err_t send_msg(atv_tls_t *tls, const remote_RemoteMessage *m)
     return ESP_OK;
 }
 
-static esp_err_t send_key(atv_tls_t *tls, int key_code)
+static esp_err_t send_key(atv_tls_t *tls, const key_cmd_t *cmd)
 {
     remote_RemoteMessage m = remote_RemoteMessage_init_zero;
     m.has_remote_key_inject = true;
-    m.remote_key_inject.key_code = (remote_RemoteKeyCode)key_code;
-    m.remote_key_inject.direction = remote_RemoteDirection_SHORT;
+    m.remote_key_inject.key_code = (remote_RemoteKeyCode)cmd->code;
+    m.remote_key_inject.direction = (remote_RemoteDirection)cmd->direction;
     return send_msg(tls, &m);
 }
 
@@ -158,9 +166,9 @@ esp_err_t remote_session(atv_tls_t *tls)
         uint8_t first;
         int r = atv_tls_read(tls, &first, 1, POLL_TIMEOUT_MS);
         if (r == MBEDTLS_ERR_SSL_TIMEOUT) {
-            int key_code;
-            while (g_key_queue && xQueueReceive(g_key_queue, &key_code, 0) == pdTRUE) {
-                if (send_key(tls, key_code) != ESP_OK) {
+            key_cmd_t cmd;
+            while (g_key_queue && xQueueReceive(g_key_queue, &cmd, 0) == pdTRUE) {
+                if (send_key(tls, &cmd) != ESP_OK) {
                     return ESP_FAIL;
                 }
             }

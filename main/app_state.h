@@ -35,7 +35,13 @@ extern QueueHandle_t g_pair_code_queue;  // item: char[PAIR_CODE_LEN + 1]
 #define PAIR_EVENT_FAIL BIT1
 extern EventGroupHandle_t g_pair_events;
 
-// Key commands for the control channel: int RemoteKeyCode values.
+// Key commands for the control channel. direction is a RemoteDirection
+// value: SHORT for taps, START_LONG/END_LONG for press-and-hold (volume
+// keys only respond to the press/release pair on Chromecast).
+typedef struct {
+    int code;       // RemoteKeyCode
+    int direction;  // RemoteDirection
+} key_cmd_t;
 extern QueueHandle_t g_key_queue;
 
 void app_state_init(void);

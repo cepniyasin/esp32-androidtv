@@ -19,7 +19,9 @@
   #pairmsg { font-size: 0.9rem; min-height: 1.2em; }
   #keys { display: none; grid-template-columns: repeat(3, 4.5rem); gap: 0.4rem; }
   #keys.visible { display: grid; }
-  #keys button { padding: 0.8rem 0; font-size: 0.9rem; }
+  #keys button { padding: 0.8rem 0; font-size: 0.9rem;
+                 touch-action: manipulation; user-select: none;
+                 -webkit-user-select: none; }
 </style>
 </head>
 <body>
@@ -31,20 +33,22 @@
   <button id="send">Pair</button>
   <p id="pairmsg"></p>
 </div>
-<!-- Debug buttons for Phase 6; real layout comes in Phase 7 -->
+<!-- Debug buttons for Phase 6; real layout comes in Phase 7.
+     data-hold buttons send START_LONG on press / END_LONG on release
+     (required for volume on Chromecast; enables hold-to-repeat). -->
 <div id="keys">
   <button data-key="POWER">⏻</button>
-  <button data-key="DPAD_UP">▲</button>
+  <button data-key="DPAD_UP" data-hold>▲</button>
   <button data-key="BACK">←</button>
-  <button data-key="DPAD_LEFT">◀</button>
+  <button data-key="DPAD_LEFT" data-hold>◀</button>
   <button data-key="DPAD_CENTER">OK</button>
-  <button data-key="DPAD_RIGHT">▶</button>
+  <button data-key="DPAD_RIGHT" data-hold>▶</button>
   <button data-key="HOME">⌂</button>
-  <button data-key="DPAD_DOWN">▼</button>
+  <button data-key="DPAD_DOWN" data-hold>▼</button>
   <button data-key="MEDIA_PLAY_PAUSE">⏯</button>
-  <button data-key="VOLUME_DOWN">V−</button>
-  <button data-key="VOLUME_MUTE">🔇</button>
-  <button data-key="VOLUME_UP">V+</button>
+  <button data-key="VOLUME_DOWN" data-hold>V−</button>
+  <button data-key="VOLUME_MUTE" data-tap-pair>🔇</button>
+  <button data-key="VOLUME_UP" data-hold>V+</button>
 </div>
 <script>
 const statusEl = document.getElementById('status');
@@ -87,12 +91,33 @@ document.getElementById('send').onclick = async () => {
   poll();
 };
 
-document.querySelectorAll('#keys button').forEach(b => {
-  b.onclick = () => fetch('/api/key', {
+function sendKey(key, direction = 'SHORT') {
+  return fetch('/api/key', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({key: b.dataset.key}),
-  });
+    body: JSON.stringify({key, direction}),
+  }).catch(() => {});
+}
+
+document.querySelectorAll('#keys button').forEach(b => {
+  const key = b.dataset.key;
+  if (b.dataset.hold !== undefined) {
+    // Press/release pair: quick tap acts like a click, holding repeats.
+    let down = false;
+    const release = () => { if (down) { down = false; sendKey(key, 'END_LONG'); } };
+    b.addEventListener('pointerdown', e => {
+      e.preventDefault(); down = true; sendKey(key, 'START_LONG');
+    });
+    b.addEventListener('pointerup', release);
+    b.addEventListener('pointercancel', release);
+    b.addEventListener('pointerleave', release);
+    b.addEventListener('contextmenu', e => e.preventDefault());
+  } else if (b.dataset.tapPair !== undefined) {
+    // Keys the TV ignores as SHORT (volume group): send press+release.
+    b.onclick = async () => { await sendKey(key, 'START_LONG'); sendKey(key, 'END_LONG'); };
+  } else {
+    b.onclick = () => sendKey(key);
+  }
 });
 
 poll();

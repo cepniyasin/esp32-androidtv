@@ -12,3 +12,6 @@ esp_err_t remote_session(atv_tls_t *tls);
 // Maps a key name from TvKeys.txt (e.g. "DPAD_UP", with or without the
 // KEYCODE_ prefix) to its RemoteKeyCode value, or -1 if unknown.
 int remote_key_from_name(const char *name);
+
+// Maps "SHORT"/"START_LONG"/"END_LONG" to RemoteDirection, or -1.
+int remote_direction_from_name(const char *name);

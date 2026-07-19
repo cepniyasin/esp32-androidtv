@@ -9,7 +9,7 @@ void app_state_init(void)
 {
     g_pair_code_queue = xQueueCreate(1, PAIR_CODE_LEN + 1);
     g_pair_events = xEventGroupCreate();
-    g_key_queue = xQueueCreate(8, sizeof(int));
+    g_key_queue = xQueueCreate(8, sizeof(key_cmd_t));
     g_atv_status.state = ATV_STATE_BOOT;
 }
 
