@@ -9,6 +9,11 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { color-scheme: dark; }
   body {
+    /* the whole remote is chrome, not content: nothing selectable, no
+       long-press callouts anywhere (e.g. status text next to buttons) */
+    user-select: none; -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
     font-family: system-ui, -apple-system, sans-serif;
     background: linear-gradient(180deg, #15191f 0%, #0c0f13 100%);
     color: #e8eaed;
@@ -89,6 +94,7 @@
   #pair.visible { display: flex; }
   #pair p { font-size: 0.9rem; color: #9aa0a6; }
   #code {
+    user-select: text; -webkit-user-select: text;  /* input stays editable */
     font: inherit; font-size: 1.4rem; width: 9ch; text-align: center;
     text-transform: uppercase; letter-spacing: 0.25ch;
     background: #10151b; color: #e8eaed;
