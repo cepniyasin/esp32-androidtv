@@ -119,34 +119,44 @@ function sendKey(key, direction = 'SHORT') {
   return keyChain;
 }
 
-// Minimum press duration for press/release pairs; below this the TV may
-// treat the pair as bounce and ignore it.
-const MIN_PRESS_MS = 150;
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+// A press shorter than this is a tap (single SHORT). Only a real hold
+// sends the START_LONG/END_LONG pair — rapid long-press pairs make the
+// Chromecast close the control connection.
+const HOLD_THRESHOLD_MS = 300;
 let holding = false;  // suppress status polling during a hold
 
 document.querySelectorAll('#keys button').forEach(b => {
   const key = b.dataset.key;
   if (b.dataset.hold !== undefined) {
-    // Press/release pair: quick tap acts like a click, holding repeats.
-    let downAt = 0;
-    const release = async () => {
-      if (!downAt) return;
-      const held = Date.now() - downAt;
-      downAt = 0;
+    // Tap -> single SHORT. Held past the threshold -> START_LONG, then
+    // END_LONG on release (auto-repeat happens on the TV).
+    let down = false;
+    let longActive = false;
+    let holdTimer = null;
+    const release = () => {
+      if (!down) return;
+      down = false;
       holding = false;
-      if (held < MIN_PRESS_MS) await sleep(MIN_PRESS_MS - held);
-      sendKey(key, 'END_LONG');
+      clearTimeout(holdTimer);
+      if (longActive) {
+        longActive = false;
+        sendKey(key, 'END_LONG');
+      } else {
+        sendKey(key, 'SHORT');
+      }
     };
     b.addEventListener('pointerdown', e => {
       e.preventDefault();
-      if (downAt) return;  // debounce double-fire
+      if (down) return;  // debounce double-fire
       // Capture the pointer so finger drift off the button doesn't end
       // the hold (pointerleave would otherwise fire mid-hold).
       b.setPointerCapture(e.pointerId);
-      downAt = Date.now();
+      down = true;
       holding = true;
-      sendKey(key, 'START_LONG');
+      holdTimer = setTimeout(() => {
+        longActive = true;
+        sendKey(key, 'START_LONG');
+      }, HOLD_THRESHOLD_MS);
     });
     b.addEventListener('pointerup', release);
     b.addEventListener('pointercancel', release);
