@@ -1,0 +1,15 @@
+menu "Android TV Remote"
+
+    config ATV_WIFI_SSID
+        string "WiFi SSID"
+        default ""
+        help
+            SSID of the WiFi network the ESP32 should join.
+
+    config ATV_WIFI_PASSWORD
+        string "WiFi password"
+        default ""
+        help
+            Password of the WiFi network (leave empty for open networks).
+
+endmenu
