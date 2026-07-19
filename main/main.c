@@ -5,6 +5,7 @@
 #include "freertos/task.h"
 #include "net_tls.h"
 #include "nvs_flash.h"
+#include "webserver.h"
 #include "pb_decode.h"
 #include "pb_encode.h"
 #include "polo.pb.h"
@@ -90,6 +91,8 @@ void app_main(void)
     }
 
     ESP_LOGI(TAG, "Phase 0 complete: WiFi up, nanopb working.");
+
+    ESP_ERROR_CHECK(webserver_start());
 
     xTaskCreate(tv_session_task, "tv_session", 10240, NULL, 5, NULL);
 }
