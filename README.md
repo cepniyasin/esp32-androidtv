@@ -24,7 +24,6 @@ install, no soldering.
 <!-- Placeholders — swap these for real phone screenshots of the running UI. -->
 <p align="center">
   <img src="docs/screenshots/remote.png" width="30%" alt="Remote UI screenshot placeholder">
-  <img src="docs/screenshots/pairing.png" width="30%" alt="Pairing screen screenshot placeholder">
   <img src="docs/screenshots/logs.png" width="30%" alt="Log viewer screenshot placeholder">
 </p>
 
