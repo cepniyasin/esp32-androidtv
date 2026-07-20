@@ -31,6 +31,14 @@ typedef struct {
 
 extern atv_status_t g_atv_status;
 
+// Independent connection state for the Samsung TV WebSocket volume
+// fallback (see samsung_tv.c). Unused/always-disconnected if
+// CONFIG_ATV_SAMSUNG_TV_IP is empty.
+typedef struct {
+    volatile bool connected;
+} samsung_status_t;
+extern samsung_status_t g_samsung_status;
+
 // Pairing code entered in the web UI: 6 hex chars + NUL.
 #define PAIR_CODE_LEN 6
 extern QueueHandle_t g_pair_code_queue;  // item: char[PAIR_CODE_LEN + 1]

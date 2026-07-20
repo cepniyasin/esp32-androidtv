@@ -42,6 +42,17 @@ Facts already verified against `pairing.py` / `remote.py` (v2 protocol):
 - **Keepalive reality:** the Chromecast HD does NOT ping every 5 s as the reference assumes — it can stay silent >16 s. Never use a fixed idle disconnect; probe with our own `remote_ping_request` after ~10 s of silence and reconnect only if the reply doesn't arrive (implemented in `remote.c`).
 - Both TLS connections: present our self-signed RSA-2048 client cert (`certs/`), skip server verification. Same cert for pairing and control — regenerating it breaks the TV's trust.
 
+### Samsung TV fallback (volume)
+
+Since volume can't be controlled via the Android TV Remote protocol on this hardware, `main/samsung_tv.c` talks directly to a Samsung Tizen TV's own local remote-control API as a fallback — verified against `xchwarze/samsung-tv-ws-api` (the library behind Home Assistant's `samsungtv` integration):
+
+- **Endpoint:** `wss://<CONFIG_ATV_SAMSUNG_TV_IP>:8002/api/v2/channels/samsung.remote.control?name=<base64 app name>`, TLS with server-cert verification skipped (`skip_cert_common_name_check=true`, no CA configured — same trust posture as the Chromecast's cert in `net_tls.c`). `name` is base64 of a display string shown on the TV's pairing prompt; this firmware hardcodes `RVNQMzIgUmVtb3Rl` = `base64("ESP32 Remote")`. **Confirmed on hardware (2020 Q60T, Tizen):** the plain `ws://:8001` variant that some references describe as simpler does *not* work here — the TV replies instantly with `{"event":"ms.channel.unauthorized"}` and closes the socket without ever showing the on-screen prompt. Only `wss://:8002` actually triggers the prompt on this firmware.
+- **First connection:** the TV shows an on-screen "Allow this device?" prompt. On approval it sends `{"event":"ms.channel.connect","data":{"token":"..."}}`; save the token (NVS, `store_get/set_samsung_token`) and append `&token=<token>` to the URL on future connections to skip the prompt.
+- **Key press:** `{"method":"ms.remote.control","params":{"Cmd":"Click","DataOfCmd":"KEY_VOLUP","Option":"false","TypeOfRemote":"SendRemoteKey"}}` (`DataOfCmd` is `KEY_VOLUP`/`KEY_VOLDOWN`/`KEY_MUTE`). Click-only — no `START_LONG`/`END_LONG` equivalent, so a held volume button steps once per press rather than auto-repeating.
+- Routing lives in `webserver.c:key_post_handler`: a `VOLUME_UP`/`VOLUME_DOWN`/`VOLUME_MUTE` key is sent to the Samsung TV instead of the Chromecast only when `g_atv_status.vol_max == 0` **and** `g_samsung_status.connected` — everything else is unaffected.
+- Unlike `net_tls.c`, `esp_websocket_client_send_text()` is safe to call from any task (library-internal locking), so the HTTP handler calls it directly — no dedicated writer task/queue for this path.
+- Empty `CONFIG_ATV_SAMSUNG_TV_IP` (Kconfig) disables the feature entirely; `samsung_tv_init()` no-ops.
+
 ## Constraints & conventions
 
 - Only the TV-session FreeRTOS task writes to the TLS socket. HTTP handlers post commands to its queue (PLAN.md §4.5).

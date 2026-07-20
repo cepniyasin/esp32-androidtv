@@ -1,2 +1,7 @@
 CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
 CONFIG_LWIP_MAX_SOCKETS=16
+# Samsung TV WebSocket fallback (samsung_tv.c) connects to the TV's
+# self-signed cert on :8002 without a CA, same trust model net_tls.c
+# already uses for the Chromecast.
+CONFIG_ESP_TLS_INSECURE=y
+CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY=y

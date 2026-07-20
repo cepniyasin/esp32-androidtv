@@ -271,9 +271,10 @@ async function poll() {
       : s.state === 'wait_code' ? 'pairing'
       : s.state.replace('_', ' ');
     pairEl.classList.toggle('visible', s.state === 'wait_code');
-    // max == 0: the device delegates volume to the TV over CEC; the
-    // protocol cannot change it.
-    const volOk = s.volume && s.volume.max > 0;
+    // max == 0: the Chromecast delegates volume to the TV over CEC and
+    // can't change it itself — but the firmware falls back to talking to
+    // a Samsung TV directly if one is configured and paired.
+    const volOk = (s.volume && s.volume.max > 0) || (s.samsung && s.samsung.connected);
     document.querySelectorAll('[data-vol]').forEach(v => {
       v.classList.toggle('nosupport', !volOk);
     });

@@ -19,4 +19,14 @@ menu "Android TV Remote"
             LAN IP of the TV. Pairing uses port 6467, control port 6466.
             (mDNS discovery is a later stretch goal.)
 
+    config ATV_SAMSUNG_TV_IP
+        string "Samsung TV IP address (optional, volume fallback)"
+        default "192.168.0.74"
+        help
+            LAN IP of a Samsung Tizen TV to use as a volume-control
+            fallback when the Chromecast reports it cannot control volume
+            (remote_set_volume_level.volume_max == 0). Leave empty to
+            disable this feature entirely. Uses the TV's local WebSocket
+            remote API on port 8001.
+
 endmenu

@@ -9,6 +9,7 @@
 #include "nvs_flash.h"
 #include "pairing.h"
 #include "remote.h"
+#include "samsung_tv.h"
 #include "store.h"
 #include "webserver.h"
 #include "pb_decode.h"
@@ -138,6 +139,7 @@ void app_main(void)
     ESP_LOGI(TAG, "Phase 0 complete: WiFi up, nanopb working.");
 
     ESP_ERROR_CHECK(webserver_start());
+    samsung_tv_init();
 
     if (g_atv_status.paired) {
         g_atv_status.state = ATV_STATE_PAIRED;

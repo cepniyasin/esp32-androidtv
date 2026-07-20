@@ -11,6 +11,7 @@
 #include "logbuf.h"
 #include "mdns.h"
 #include "remote.h"
+#include "samsung_tv.h"
 
 static const char *TAG = "webserver";
 
@@ -71,15 +72,17 @@ static esp_err_t png_handler(httpd_req_t *req)
 
 static esp_err_t status_get_handler(httpd_req_t *req)
 {
-    char body[160];
+    char body[200];
     int len = snprintf(body, sizeof(body),
                        "{\"paired\":%s,\"connected\":%s,\"state\":\"%s\","
-                       "\"volume\":{\"level\":%d,\"max\":%d,\"muted\":%s}}",
+                       "\"volume\":{\"level\":%d,\"max\":%d,\"muted\":%s},"
+                       "\"samsung\":{\"connected\":%s}}",
                        g_atv_status.paired ? "true" : "false",
                        g_atv_status.connected ? "true" : "false",
                        atv_state_str(g_atv_status.state),
                        g_atv_status.vol_level, g_atv_status.vol_max,
-                       g_atv_status.vol_muted ? "true" : "false");
+                       g_atv_status.vol_muted ? "true" : "false",
+                       g_samsung_status.connected ? "true" : "false");
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, body, len);
 }
@@ -156,6 +159,17 @@ static bool json_get_str(const char *body, const char *field,
     return true;
 }
 
+// Volume keys the Chromecast can't act on (volume_max == 0, see CLAUDE.md
+// "Samsung TV fallback (volume)") get rerouted to a Samsung TV's own local
+// WebSocket remote API instead. Returns NULL for any other key name.
+static const char *samsung_key_name(const char *atv_key_name)
+{
+    if (strcmp(atv_key_name, "VOLUME_UP") == 0) return "KEY_VOLUP";
+    if (strcmp(atv_key_name, "VOLUME_DOWN") == 0) return "KEY_VOLDOWN";
+    if (strcmp(atv_key_name, "VOLUME_MUTE") == 0) return "KEY_MUTE";
+    return NULL;
+}
+
 // Accepts {"key":"DPAD_UP","direction":"START_LONG"} (any TvKeys.txt name;
 // direction optional, default SHORT); queues it for the TV-session task.
 static esp_err_t key_post_handler(httpd_req_t *req)
@@ -179,6 +193,24 @@ static esp_err_t key_post_handler(httpd_req_t *req)
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "unknown key or direction");
         return ESP_FAIL;
     }
+
+    const char *samsung_name = samsung_key_name(name);
+    if (samsung_name != NULL && g_atv_status.vol_max == 0 && g_samsung_status.connected) {
+        // Samsung's remote API is click-only: a tap or the start of a hold
+        // both become one Click; the matching release is a no-op (no
+        // repeat-while-held on this path).
+        bool ok = true;
+        if (cmd.direction != remote_direction_from_name("END_LONG")) {
+            ok = samsung_tv_send_key(samsung_name);
+        }
+        httpd_resp_set_type(req, "application/json");
+        if (!ok) {
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "samsung send failed");
+            return ESP_FAIL;
+        }
+        return httpd_resp_sendstr(req, "{\"ok\":true}");
+    }
+
     if (!g_atv_status.connected) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "not connected to the TV");
         return ESP_FAIL;

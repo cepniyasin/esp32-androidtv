@@ -9,10 +9,11 @@ idf_component_register(
          "pairing.c"
          "store.c"
          "remote.c"
+         "samsung_tv.c"
          "proto_gen/polo.pb.c"
          "proto_gen/remotemessage.pb.c"
     INCLUDE_DIRS "." "proto_gen"
-    PRIV_REQUIRES nvs_flash esp_wifi nanopb mbedtls esp_http_server
+    PRIV_REQUIRES nvs_flash esp_wifi nanopb mbedtls esp_http_server json esp_websocket_client
     EMBED_TXTFILES "../certs/client.pem" "../certs/client.key" "../web/index.html"
     EMBED_FILES "../web/icon-192.png" "../web/icon-512.png" "../web/apple-touch-icon.png"
 )

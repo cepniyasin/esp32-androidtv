@@ -1,6 +1,7 @@
 #include "app_state.h"
 
 atv_status_t g_atv_status;
+samsung_status_t g_samsung_status;
 QueueHandle_t g_pair_code_queue;
 EventGroupHandle_t g_pair_events;
 QueueHandle_t g_key_queue;
