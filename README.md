@@ -12,6 +12,9 @@ install, no soldering.
 - One-time pairing with the TV's on-screen code, done entirely from the web UI
 - D-pad, OK, back, home, play/pause, power; press-and-hold auto-repeat
 - Netflix / YouTube launch buttons (app deep links)
+- Volume/mute — via a **Samsung TV** fallback when paired with one (see
+  [Volume control](#volume-control) below); the Android TV Remote protocol
+  itself has no volume support on Chromecast with Google TV
 - Reachable at `http://androidtv-remote.local/` via mDNS
 - Installable as a **Progressive Web App** — add it to your phone's home
   screen and it opens full-screen, like a native remote app (see
@@ -76,6 +79,40 @@ chrome, and it reconnects to the ESP32 on launch the same way the page does.
 
 ---
 
+## Volume control
+
+**Volume/mute do not work over the Android TV Remote protocol on Chromecast
+with Google TV, full stop.** The device reports `volume_max: 0` — it
+delegates volume entirely to the TV over HDMI-CEC, a path this protocol has
+no access to. This isn't a bug in this firmware; the official reference
+Python library (`androidtvremote2`) can't change volume on this hardware
+either.
+
+If your TV is a **Samsung** running Tizen (2016+ models — this has been
+verified on a 2020 Q60T), the firmware can control volume/mute by talking
+directly to the TV's own local WebSocket remote-control API instead,
+bypassing the Chromecast entirely:
+
+```sh
+pio run -t menuconfig    # menu: "Android TV Remote" -> "Samsung TV IP address"
+```
+
+- Set it to the Samsung TV's LAN IP (leave empty to disable this entirely —
+  the default).
+- Flash and boot; the TV shows an on-screen "Allow this device to connect?"
+  prompt the first time. Approve it. The firmware saves the pairing token
+  (NVS) so future boots don't prompt again.
+- Once connected, the web UI's volume buttons un-grey and work — see the
+  connection status via the log viewer (terminal icon, top bar) if it's not
+  showing up.
+
+This is a hard requirement of the TV brand: there's no generic way to
+control volume for non-Samsung TVs without adding hardware (IR blaster or an
+HDMI-CEC breakout), which this project doesn't do. If your TV isn't Samsung,
+volume buttons stay disabled.
+
+---
+
 ## How it works
 
 Three connections, two protocols:
@@ -107,9 +144,9 @@ remote could send them).
 | Endpoint | Method | Body / Response |
 |----------|--------|-----------------|
 | `/` | GET | the remote UI |
-| `/api/status` | GET | `{"paired":bool,"connected":bool,"state":str,"volume":{level,max,muted}}` |
+| `/api/status` | GET | `{"paired":bool,"connected":bool,"state":str,"volume":{level,max,muted},"samsung":{connected:bool},"version":str}` |
 | `/api/pair` | POST | `{"code":"A1B2C3"}` → `{"ok":bool}` (only valid in `wait_code` state) |
-| `/api/key` | POST | `{"key":"DPAD_UP","direction":"SHORT"}` — any name from the `RemoteKeyCode` enum, `KEYCODE_` prefix optional; direction `SHORT` (default) / `START_LONG` / `END_LONG` |
+| `/api/key` | POST | `{"key":"DPAD_UP","direction":"SHORT"}` — any name from the `RemoteKeyCode` enum, `KEYCODE_` prefix optional; direction `SHORT` (default) / `START_LONG` / `END_LONG`. `VOLUME_UP`/`VOLUME_DOWN`/`VOLUME_MUTE` reroute to the Samsung TV fallback when the Chromecast can't handle them (see [Volume control](#volume-control)) |
 | `/api/app` | POST | `{"link":"netflix://home"}` — app deep link |
 
 `state` values: `boot`, `pairing`, `wait_code`, `pair_failed`, `paired`
@@ -123,16 +160,19 @@ main/               firmware sources (one .c/.h per subsystem)
   proto_frame.*     varint length-delimited framing (transport-agnostic)
   pairing.*         pairing state machine + secret computation
   remote.*          control channel: configure, keepalive, keys, app links
+  samsung_tv.*      Samsung TV WebSocket volume fallback (optional)
   webserver.*       esp_http_server routes + mDNS
   app_state.*       shared status struct + command queues
-  store.*           NVS persistence (paired flag)
+  store.*           NVS persistence (paired flag, Samsung pairing token)
+  logbuf.*          in-RAM ring buffer feeding the web log viewer
+  version.h         FW_VERSION (auto-bumped by semantic-release)
   proto_gen/        GENERATED nanopb code — never edit by hand
 components/nanopb/  vendored nanopb 0.4.9.1 runtime
 proto/              .proto files (verbatim from the reference) + nanopb .options
 web/index.html      the whole web UI (inline CSS/JS), embedded into firmware
 certs/              client cert/key (gitignored — generate with tools/gen_cert.sh)
 test/               host unit tests + golden-byte generators
-tools/              gen_cert.sh, gen_proto.sh, test_host.sh
+tools/              gen_cert.sh, gen_proto.sh, test_host.sh, bump_version.sh
 ```
 
 ## Development
@@ -222,11 +262,17 @@ embedded in the firmware. Links longer than 127 characters are rejected
 
 ## Device quirks (learned the hard way)
 
-- **Volume/mute don't work on Chromecast HD — and can't.** The device
-  delegates volume to the TV over HDMI-CEC and reports `volume_max: 0`; its
-  physical remote uses an IR blaster. The reference Python library can't
-  change volume either. The UI greys the volume buttons when it sees
-  `max: 0`.
+- **Volume/mute can't work over the Android TV Remote protocol, period.**
+  The Chromecast reports `volume_max: 0` and delegates volume to the TV over
+  HDMI-CEC; the reference Python library can't change it either. See
+  [Volume control](#volume-control) for the Samsung TV fallback — the UI
+  greys the volume buttons unless that's connected.
+- **Samsung's WebSocket remote API needs `wss://:8002`, not `ws://:8001`.**
+  The simpler-looking plain-HTTP port (which some references suggest is
+  enough) got an instant `ms.channel.unauthorized` with no on-screen prompt
+  on a 2020 Tizen TV — only the TLS port actually triggers pairing. Needs
+  `CONFIG_ESP_TLS_INSECURE`/`CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY` since
+  esp-tls refuses an unverified connection otherwise (self-signed TV cert).
 - **The TV closes the session on rapid long-press pairs.** Taps must be sent
   as `SHORT`; the `START_LONG`/`END_LONG` pair is reserved for real holds
   (the UI uses a 300 ms threshold).
