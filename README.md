@@ -21,10 +21,9 @@ install, no soldering.
 
 ## Screenshots
 
-<!-- Placeholders — swap these for real phone screenshots of the running UI. -->
 <p align="center">
-  <img src="docs/screenshots/remote.png" width="30%" alt="Remote UI screenshot placeholder">
-  <img src="docs/screenshots/logs.png" width="30%" alt="Log viewer screenshot placeholder">
+  <img src="docs/screenshots/remote.webp" width="30%" alt="Remote UI">
+  <img src="docs/screenshots/logs.webp" width="30%" alt="Log viewer">
 </p>
 
 ---
