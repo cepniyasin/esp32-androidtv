@@ -118,6 +118,14 @@ void app_main(void)
 {
     logbuf_init();  // before anything else, so boot-time logs are captured too
 
+    // httpd logs a client dropping its TCP connection (phone screen lock,
+    // backgrounded browser, etc.) as a warning — routine, not a real
+    // error. Keep it out of the default log; still visible if someone
+    // raises the global default log level to Debug for troubleshooting.
+#if CONFIG_LOG_DEFAULT_LEVEL < 4
+    esp_log_level_set("httpd_txrx", ESP_LOG_ERROR);
+#endif
+
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
