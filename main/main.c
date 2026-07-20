@@ -11,6 +11,7 @@
 #include "remote.h"
 #include "samsung_tv.h"
 #include "store.h"
+#include "version.h"
 #include "webserver.h"
 #include "pb_decode.h"
 #include "pb_encode.h"
@@ -117,6 +118,7 @@ static void tv_session_task(void *arg)
 void app_main(void)
 {
     logbuf_init();  // before anything else, so boot-time logs are captured too
+    ESP_LOGI(TAG, "esp32-androidtv v" FW_VERSION " starting");
 
     // httpd logs a client dropping its TCP connection (phone screen lock,
     // backgrounded browser, etc.) as a warning — routine, not a real

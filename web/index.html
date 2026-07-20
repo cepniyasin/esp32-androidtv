@@ -154,6 +154,9 @@
   }
   #pair button { padding: 10px 26px; background: #8ab4f8; color: #10151b; font-weight: 600; }
   #pairmsg { font-size: 0.85rem; min-height: 1.1em; color: #9aa0a6; }
+
+  /* footer */
+  #footer { text-align: center; font-size: 0.72rem; color: #444b54; }
 </style>
 </head>
 <body>
@@ -229,6 +232,8 @@
     <button id="app-netflix" data-link="netflix://home">NETFLIX</button>
     <button id="app-youtube" data-link="https://www.youtube.com/tv">YouTube</button>
   </div>
+
+  <div id="footer">v<span id="fwversion">…</span></div>
 </div>
 
 <script>
@@ -236,6 +241,7 @@ const statusText = document.getElementById('statustext');
 const statusDot = document.getElementById('statusdot');
 const pairEl = document.getElementById('pair');
 const msgEl = document.getElementById('pairmsg');
+const fwversion = document.getElementById('fwversion');
 let pairing = false;
 let holding = false;
 
@@ -271,6 +277,7 @@ async function poll() {
       : s.state === 'wait_code' ? 'pairing'
       : s.state.replace('_', ' ');
     pairEl.classList.toggle('visible', s.state === 'wait_code');
+    if (s.version) fwversion.textContent = s.version;
     // max == 0: the Chromecast delegates volume to the TV over CEC and
     // can't change it itself — but the firmware falls back to talking to
     // a Samsung TV directly if one is configured and paired.

@@ -1,0 +1,26 @@
+# Changelog
+
+Versions follow [SemVer](https://semver.org/). This is `0.x` — still
+per-device config (WiFi creds, TV IPs) rather than something a stranger
+clones and runs unmodified, so the public surface isn't frozen yet.
+
+## [0.1.0] — 2026-07-20
+
+First tagged version. Everything up to this point, in one release:
+
+- Pairing with a Chromecast with Google TV over the Android TV Remote
+  protocol v2 (mutual TLS, protobuf/nanopb), done entirely from the web UI
+- Control channel with keepalive, auto-reconnect (backoff capped at 15 s),
+  and command requeueing across reconnects
+- Key injection (d-pad, OK, back, home, play/pause, power), with
+  press-and-hold auto-repeat and TV-safe key pacing
+- App launch buttons (Netflix/YouTube) via deep links, and instructions for
+  adding more
+- Web UI: SVG icon remote, mDNS at `androidtv-remote.local`, PWA
+  manifest/icons for "Add to Home Screen" installs
+- In-browser firmware log viewer (`/api/logs`, ring-buffer backed) — see
+  what the device is doing without a serial monitor
+- Samsung TV volume fallback: when the Chromecast reports it can't control
+  volume (`volume_max == 0`, delegated to the TV over CEC), volume/mute
+  buttons reroute to the Samsung TV's own local WebSocket remote API
+- Firmware version now shown in the web UI footer and `/api/status`

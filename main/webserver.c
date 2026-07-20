@@ -12,6 +12,7 @@
 #include "mdns.h"
 #include "remote.h"
 #include "samsung_tv.h"
+#include "version.h"
 
 static const char *TAG = "webserver";
 
@@ -72,11 +73,11 @@ static esp_err_t png_handler(httpd_req_t *req)
 
 static esp_err_t status_get_handler(httpd_req_t *req)
 {
-    char body[200];
+    char body[220];
     int len = snprintf(body, sizeof(body),
                        "{\"paired\":%s,\"connected\":%s,\"state\":\"%s\","
                        "\"volume\":{\"level\":%d,\"max\":%d,\"muted\":%s},"
-                       "\"samsung\":{\"connected\":%s}}",
+                       "\"samsung\":{\"connected\":%s},\"version\":\"" FW_VERSION "\"}",
                        g_atv_status.paired ? "true" : "false",
                        g_atv_status.connected ? "true" : "false",
                        atv_state_str(g_atv_status.state),
