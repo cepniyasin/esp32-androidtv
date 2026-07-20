@@ -13,9 +13,20 @@ install, no soldering.
 - D-pad, OK, back, home, play/pause, power; press-and-hold auto-repeat
 - Netflix / YouTube launch buttons (app deep links)
 - Reachable at `http://androidtv-remote.local/` via mDNS
-- "Add to Home Screen" support (PWA manifest + icons)
+- Installable as a **Progressive Web App** — add it to your phone's home
+  screen and it opens full-screen, like a native remote app (see
+  [Install as an app](#install-as-an-app-pwa) below)
 - Auto-reconnects through WiFi blips, TV reboots, and power loss — pairing
   survives everything short of deleting the certificate
+
+## Screenshots
+
+<!-- Placeholders — swap these for real phone screenshots of the running UI. -->
+<p align="center">
+  <img src="docs/screenshots/remote.png" width="30%" alt="Remote UI screenshot placeholder">
+  <img src="docs/screenshots/pairing.png" width="30%" alt="Pairing screen screenshot placeholder">
+  <img src="docs/screenshots/logs.png" width="30%" alt="Log viewer screenshot placeholder">
+</p>
 
 ---
 
@@ -43,12 +54,27 @@ pio run -t upload
 ```
 
 That's it. The remote reconnects automatically on every boot from then on.
-On your phone, use the browser's **Add to Home Screen** to install it like an
-app.
 
 > If your board uses a different module, change `board = esp32doit-devkit-v1`
 > in `platformio.ini` (any 4 MB-flash ESP32 works; ESP8266 does not — not
 > enough RAM for mutual TLS).
+
+---
+
+## Install as an app (PWA)
+
+The web UI ships a PWA manifest and icons, so it installs like a native app
+instead of living as a browser tab — worth doing, since it opens full-screen
+with no address bar, gets its own home-screen icon, and launches straight
+into the remote.
+
+- **iOS (Safari):** open `http://androidtv-remote.local/`, tap the **Share**
+  icon, then **Add to Home Screen**.
+- **Android (Chrome):** open the page, tap the **⋮** menu, then **Add to Home
+  screen** / **Install app** (Chrome may also prompt automatically).
+
+Once installed, it behaves like any other app on the phone — no browser
+chrome, and it reconnects to the ESP32 on launch the same way the page does.
 
 ---
 
