@@ -5,6 +5,7 @@ idf_component_register(
          "proto_frame.c"
          "webserver.c"
          "app_state.c"
+         "logbuf.c"
          "pairing.c"
          "store.c"
          "remote.c"

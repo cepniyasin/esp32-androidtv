@@ -2,11 +2,13 @@
 
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "app_state.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
+#include "logbuf.h"
 #include "mdns.h"
 #include "remote.h"
 
@@ -215,6 +217,72 @@ static esp_err_t app_post_handler(httpd_req_t *req)
     return httpd_resp_sendstr(req, "{\"ok\":true}");
 }
 
+// Returns firmware log lines newer than ?after=<offset> as JSON:
+// {"next":<offset to poll from next>,"dropped":<bool, ring wrapped past
+// what the client had>,"text":"<escaped log text>"}. Poll with `after`
+// omitted/0 on first load (returns whatever's still in the ring), then
+// with `after=next` from the previous response.
+static esp_err_t logs_get_handler(httpd_req_t *req)
+{
+    uint32_t after = 0;
+    char query[32];
+    if (httpd_req_get_url_query_len(req) > 0 &&
+        httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK) {
+        char val[16];
+        if (httpd_query_key_value(query, "after", val, sizeof(val)) == ESP_OK) {
+            after = (uint32_t)strtoul(val, NULL, 10);
+        }
+    }
+
+    // Static: esp_http_server processes one request at a time on its
+    // single worker task, so this is not shared across concurrent clients.
+    static char raw[1536];
+    uint32_t next_pos;
+    bool dropped;
+    size_t n = logbuf_read(after, raw, sizeof(raw), &next_pos, &dropped);
+
+    httpd_resp_set_type(req, "application/json");
+    char header[64];
+    int hlen = snprintf(header, sizeof(header),
+                        "{\"next\":%lu,\"dropped\":%s,\"text\":\"",
+                        (unsigned long)next_pos, dropped ? "true" : "false");
+    httpd_resp_send_chunk(req, header, hlen);
+
+    char esc[256];
+    size_t ei = 0;
+    for (size_t i = 0; i < n; i++) {
+        char c = raw[i];
+        char repbuf[2] = {c, '\0'};
+        const char *rep = repbuf;
+        if (c == '"') {
+            rep = "\\\"";
+        } else if (c == '\\') {
+            rep = "\\\\";
+        } else if (c == '\n') {
+            rep = "\\n";
+        } else if (c == '\r') {
+            rep = "\\r";
+        } else if (c == '\t') {
+            rep = "\\t";
+        } else if ((unsigned char)c < 0x20) {
+            continue;  // drop other control chars
+        }
+        size_t rl = strlen(rep);
+        if (ei + rl > sizeof(esc)) {
+            httpd_resp_send_chunk(req, esc, ei);
+            ei = 0;
+        }
+        memcpy(esc + ei, rep, rl);
+        ei += rl;
+    }
+    if (ei > 0) {
+        httpd_resp_send_chunk(req, esc, ei);
+    }
+    httpd_resp_send_chunk(req, "\"}", 2);
+    httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;
+}
+
 static esp_err_t mdns_start(void)
 {
     ESP_ERROR_CHECK(mdns_init());
@@ -232,7 +300,7 @@ esp_err_t webserver_start(void)
     // Phones hold several keep-alive connections; without LRU purge the
     // server starts refusing new requests, which looks like dropouts.
     config.lru_purge_enable = true;
-    // Default is 8; we register 9 (page, manifest, 3 icons, 4 API).
+    // Default is 8; we register 10 (page, manifest, 3 icons, 5 API).
     config.max_uri_handlers = 12;
     httpd_handle_t server = NULL;
     esp_err_t err = httpd_start(&server, &config);
@@ -256,6 +324,9 @@ esp_err_t webserver_start(void)
     static const httpd_uri_t app_uri = {
         .uri = "/api/app", .method = HTTP_POST, .handler = app_post_handler
     };
+    static const httpd_uri_t logs_uri = {
+        .uri = "/api/logs", .method = HTTP_GET, .handler = logs_get_handler
+    };
     static const httpd_uri_t manifest_uri = {
         .uri = "/manifest.webmanifest", .method = HTTP_GET, .handler = manifest_get_handler
     };
@@ -277,6 +348,7 @@ esp_err_t webserver_start(void)
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &pair_uri));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &key_uri));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &app_uri));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &logs_uri));
 
     ESP_LOGI(TAG, "Web UI at http://androidtv-remote.local/ (port 80)");
     return ESP_OK;

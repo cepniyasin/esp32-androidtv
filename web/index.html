@@ -65,6 +65,38 @@
     display: flex; align-items: center; justify-content: center;
   }
   #power:active { background: #3d2e35; }
+  #logsbtn {
+    width: 40px; height: 40px; border-radius: 50%; margin-right: 8px;
+    color: #9aa0a6; background: #1b2129;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #logsbtn:active { background: #262e38; }
+  #logsbtn svg { width: 18px; height: 18px; }
+
+  /* log viewer */
+  #logpanel {
+    display: none; flex-direction: column; gap: 10px;
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(8,10,13,0.97);
+    padding: max(env(safe-area-inset-top), 12px) 16px
+             max(env(safe-area-inset-bottom), 16px);
+  }
+  #logpanel.visible { display: flex; }
+  #logheader { display: flex; align-items: center; justify-content: space-between; }
+  #logheader span { font-size: 0.9rem; color: #9aa0a6; }
+  #logclose {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: #232a33; color: #e8eaed;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #logtext {
+    flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    background: #10151b; border: 1px solid #232a33; border-radius: 10px;
+    padding: 10px; font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.7rem; line-height: 1.4; color: #9aa0a6;
+    white-space: pre-wrap; word-break: break-all;
+    user-select: text; -webkit-user-select: text;
+  }
 
   /* d-pad */
   #dpad {
@@ -128,9 +160,22 @@
 <div id="remote">
   <div id="topbar">
     <span id="statusline"><span id="statusdot"></span><span id="statustext">connecting…</span></span>
-    <button id="power" data-key="POWER" aria-label="Power">
-      <svg viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M17.66 6.34a8 8 0 1 1-11.32 0"/></svg>
-    </button>
+    <span style="display:flex;align-items:center;">
+      <button id="logsbtn" aria-label="Firmware logs">
+        <svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+      </button>
+      <button id="power" data-key="POWER" aria-label="Power">
+        <svg viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M17.66 6.34a8 8 0 1 1-11.32 0"/></svg>
+      </button>
+    </span>
+  </div>
+
+  <div id="logpanel">
+    <div id="logheader">
+      <span>Firmware logs</span>
+      <button id="logclose" aria-label="Close logs">✕</button>
+    </div>
+    <pre id="logtext"></pre>
   </div>
 
   <div id="pair">
@@ -307,6 +352,46 @@ document.getElementById('send').onclick = async () => {
   await poll();
   setTimeout(pollLoop, pollDelay);
 })();
+
+// Firmware log viewer: polls /api/logs, which streams new lines out of an
+// in-RAM ring buffer on the device (see main/logbuf.c). Lets you see what
+// the firmware is doing without a serial monitor.
+const logPanel = document.getElementById('logpanel');
+const logText = document.getElementById('logtext');
+let logsOpen = false;
+let logAfter = 0;
+let logPollTimer = null;
+
+async function pollLogs() {
+  if (!logsOpen) return;
+  try {
+    const r = await (await fetch(`/api/logs?after=${logAfter}`)).json();
+    if (r.dropped && logText.textContent) {
+      logText.textContent += '\n[... older log lines were overwritten ...]\n';
+    }
+    if (r.text) {
+      const atBottom = logText.scrollTop + logText.clientHeight >= logText.scrollHeight - 4;
+      logText.textContent += r.text;
+      if (atBottom) logText.scrollTop = logText.scrollHeight;
+    }
+    logAfter = r.next;
+  } catch (e) { /* status polling already surfaces unreachable */ }
+  logPollTimer = setTimeout(pollLogs, 1000);
+}
+
+document.getElementById('logsbtn').onclick = () => {
+  logsOpen = true;
+  logPanel.classList.add('visible');
+  logText.textContent = '';
+  logAfter = 0;
+  clearTimeout(logPollTimer);
+  pollLogs();
+};
+document.getElementById('logclose').onclick = () => {
+  logsOpen = false;
+  logPanel.classList.remove('visible');
+  clearTimeout(logPollTimer);
+};
 </script>
 </body>
 </html>
