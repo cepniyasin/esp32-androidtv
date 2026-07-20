@@ -1,3 +1,10 @@
+# [0.2.0](https://github.com/cepniyasin/esp32-androidtv/compare/v0.1.0...v0.2.0) (2026-07-20)
+
+
+### Features
+
+* enforce Conventional Commits and automate releases ([940183f](https://github.com/cepniyasin/esp32-androidtv/commit/940183f6b223d4ed3e8f75b600335e7bdc90fac0))
+
 # Changelog
 
 Versions follow [SemVer](https://semver.org/). This is `0.x` — still
