@@ -1,0 +1,37 @@
+name: Release
+
+# Runs semantic-release on every push to main (i.e. every squash-merged
+# PR). It reads Conventional Commit messages since the last tag, decides
+# whether a release is warranted and what the next SemVer version is,
+# bumps main/version.h + CHANGELOG.md (tools/bump_version.sh via the exec
+# plugin), commits, tags, and publishes a GitHub Release. See
+# .releaserc.json for the plugin pipeline.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - run: npx semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

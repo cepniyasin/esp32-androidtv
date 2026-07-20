@@ -7,3 +7,4 @@ __pycache__/
 certs/*.pem
 certs/*.key
 build/
+node_modules/

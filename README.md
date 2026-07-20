@@ -156,6 +156,20 @@ pio run -t monitor       # serial log, 115200 baud
 - `CLAUDE.md` records protocol ground truth and hard-won device quirks — read
   it before touching pairing, keepalive, or key-direction logic.
 
+## Releases
+
+PR titles (and thus squash-merge commit messages on `main`) must follow
+[Conventional Commits](https://www.conventionalcommits.org/) — e.g. `feat:
+add IR blaster support`, `fix: reconnect backoff overflow`. A GitHub Action
+([`pr-title.yml`](.github/workflows/pr-title.yml)) blocks merging otherwise.
+
+On every push to `main`, [`release.yml`](.github/workflows/release.yml) runs
+[semantic-release](https://semantic-release.gitbook.io/): it reads commits
+since the last tag, decides whether a release is warranted (`fix:` → patch,
+`feat:` → minor, `BREAKING CHANGE:` in the body → major), bumps
+`main/version.h` and `CHANGELOG.md`, and publishes a tag + GitHub Release.
+Nothing to run by hand — just write conventional commit messages.
+
 ## Adding app shortcut buttons
 
 The Netflix/YouTube buttons are just app **deep links** sent through

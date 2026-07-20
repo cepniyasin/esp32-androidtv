@@ -59,6 +59,7 @@ Since volume can't be controlled via the Android TV Remote protocol on this hard
 - No TLS/auth on the port-80 web UI — trusted-LAN only, by design.
 - `RemoteVoicePayload.samples` and `RemoteError.message` are nanopb callbacks (unused; voice is out of scope on ESP32).
 - Before implementing the pairing secret in C, build the Python hash oracle (PLAN.md §5) and unit-test against it.
+- **Commit/PR messages must be Conventional Commits** (`feat:`, `fix:`, `chore:`, etc.) — CI enforces the PR title, and `main/version.h`/`CHANGELOG.md`/GitHub Releases are now generated from it by semantic-release (`.releaserc.json`, `.github/workflows/release.yml`). Don't hand-edit `FW_VERSION` or `CHANGELOG.md` — they're overwritten by the release workflow on the next push to `main`.
 
 ## Phase status
 
