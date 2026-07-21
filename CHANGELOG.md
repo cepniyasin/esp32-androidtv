@@ -1,3 +1,10 @@
+## [0.2.1](https://github.com/cepniyasin/esp32-androidtv/compare/v0.2.0...v0.2.1) (2026-07-21)
+
+
+### Bug Fixes
+
+* strengthen d-pad wedge press feedback ([#6](https://github.com/cepniyasin/esp32-androidtv/issues/6)) ([ff2cd7b](https://github.com/cepniyasin/esp32-androidtv/commit/ff2cd7bfa0a104de781358af1160c313ccb6ea88))
+
 # [0.2.0](https://github.com/cepniyasin/esp32-androidtv/compare/v0.1.0...v0.2.0) (2026-07-20)
 
 
