@@ -56,6 +56,7 @@
     -webkit-touch-callout: none;
     -webkit-tap-highlight-color: transparent;
     transition: background 0.12s, transform 0.06s;
+    position: relative;
   }
   /* .pressed is the JS-driven equivalent of :active for plain-click
      buttons — see the bindPress() comment in the script below. */
@@ -67,6 +68,16 @@
     stroke-linecap: round; stroke-linejoin: round;
   }
   button svg .fill { fill: currentColor; stroke: none; }
+
+  /* Sending/failed dispatch feedback, layered as an overlay (not a
+     background swap) so it reads consistently across every button
+     regardless of that button's own ID-specific background/color rules. */
+  button.sending::after, button.sendfailed::after {
+    content: ''; position: absolute; inset: 0; border-radius: inherit;
+    pointer-events: none;
+  }
+  button.sending::after { background: rgba(255,255,255,0.22); }
+  button.sendfailed::after { background: rgba(217,48,37,0.55); }
 
   /* top bar: pinned to the top so link/power state stays visible even if
      the page ever grows tall enough to scroll */
@@ -83,11 +94,32 @@
   #statusdot.on { background: #81c995; }
   #statusline { font-size: 0.8rem; color: #9aa0a6; display: flex; align-items: center; }
   #power {
+    position: relative;
     width: 52px; height: 52px; border-radius: 50%;
     color: #f28b82; background: #2a2229;
     display: flex; align-items: center; justify-content: center;
   }
-  #power:active, #power.pressed { background: #3d2e35; }
+  #power:active { background: #3d2e35; }
+  /* Hold-to-confirm ring: a quick tap must not toggle power (accidental
+     taps near the top corner), so the confirm gesture is a plain JS
+     timer/pointer hold, not the data-hold START_LONG/END_LONG mechanism
+     used elsewhere — that path sends real hold key-codes to the TV and
+     rapid START_LONG/END_LONG pairs are known to make the Chromecast drop
+     the control connection. This ring is purely a local progress cue, and
+     the hold gesture itself (unlike a plain onclick) already keeps #power
+     genuinely pressed for a real duration, so it doesn't need the
+     .pressed/bindPress fallback other plain-click buttons use. */
+  #power .ring {
+    position: absolute; inset: -3px; width: calc(100% + 6px); height: calc(100% + 6px);
+    pointer-events: none;
+  }
+  #power .ring circle {
+    fill: none; stroke: currentColor; stroke-width: 3;
+    transform: rotate(-90deg); transform-origin: 50% 50%;
+    transition-property: stroke-dashoffset;
+    transition-timing-function: linear;
+  }
+  #power.confirmed .ring circle { stroke: #81c995; }
   #logsbtn {
     width: 40px; height: 40px; border-radius: 50%; margin-right: 8px;
     color: #9aa0a6; background: #1b2129;
@@ -212,7 +244,8 @@
       <button id="logsbtn" aria-label="Firmware logs">
         <svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
       </button>
-      <button id="power" data-key="POWER" aria-label="Power">
+      <button id="power" aria-label="Hold to toggle power">
+        <svg class="ring" viewBox="0 0 58 58"><circle cx="29" cy="29" r="26"/></svg>
         <svg viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M17.66 6.34a8 8 0 1 1-11.32 0"/></svg>
       </button>
     </span>
@@ -314,20 +347,51 @@ function bindPress(el) {
   el.addEventListener('pointerleave', release);
 }
 
+// A tap's local :active/.pressed feedback confirms the press landed; this
+// confirms the request actually left for the firmware (and, on failure,
+// that it didn't) — there's a real gap between the two given the
+// WebSocket/TLS hop to the TV. `el` is optional so non-button callers
+// (poll, pairing) don't need to pass one.
+const SEND_TIMEOUT_MS = 2000;
+const SENDFAILED_HOLD_MS = 800;
+function markSending(el) {
+  if (!el) return;
+  el.classList.remove('sendfailed');
+  el.classList.add('sending');
+}
+function markSent(el, ok) {
+  if (!el) return;
+  el.classList.remove('sending');
+  if (ok) {
+    // A late success can arrive after a timeout already flagged this
+    // send as failed; a real success always wins.
+    el.classList.remove('sendfailed');
+  } else {
+    el.classList.add('sendfailed');
+    setTimeout(() => el.classList.remove('sendfailed'), SENDFAILED_HOLD_MS);
+  }
+}
+
 // All key sends go through one promise chain: parallel fetches can arrive
 // out of order, and a release overtaking its press breaks the key.
 let keyChain = Promise.resolve();
-function post(url, body) {
+function post(url, body, el) {
+  markSending(el);
+  const timeout = new Promise(resolve => setTimeout(() => resolve('timeout'), SEND_TIMEOUT_MS));
   keyChain = keyChain
     .then(() => fetch(url, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(body),
     }))
-    .catch(() => {});
+    .then(r => { markSent(el, r.ok); })
+    .catch(() => { markSent(el, false); });
+  Promise.race([keyChain, timeout]).then(r => {
+    if (r === 'timeout') markSent(el, false);
+  });
   return keyChain;
 }
-const sendKey = (key, direction = 'SHORT') => post('/api/key', {key, direction});
+const sendKey = (key, direction = 'SHORT', el) => post('/api/key', {key, direction}, el);
 
 // A press shorter than this is a tap (single SHORT). Only a real hold
 // sends the START_LONG/END_LONG pair — rapid long-press pairs make the
@@ -362,7 +426,7 @@ async function poll() {
   }
 }
 
-document.querySelectorAll('[data-key]').forEach(b => {
+document.querySelectorAll('[data-key]:not(#power)').forEach(b => {
   const key = b.dataset.key;
   if (b.dataset.hold !== undefined) {
     let down = false;
@@ -375,9 +439,9 @@ document.querySelectorAll('[data-key]').forEach(b => {
       clearTimeout(holdTimer);
       if (longActive) {
         longActive = false;
-        sendKey(key, 'END_LONG');
+        sendKey(key, 'END_LONG', b);
       } else {
-        sendKey(key, 'SHORT');
+        sendKey(key, 'SHORT', b);
       }
     };
     b.addEventListener('pointerdown', e => {
@@ -388,7 +452,7 @@ document.querySelectorAll('[data-key]').forEach(b => {
       holding = true;
       holdTimer = setTimeout(() => {
         longActive = true;
-        sendKey(key, 'START_LONG');
+        sendKey(key, 'START_LONG', b);
       }, HOLD_THRESHOLD_MS);
     });
     b.addEventListener('pointerup', release);
@@ -396,14 +460,62 @@ document.querySelectorAll('[data-key]').forEach(b => {
     b.addEventListener('contextmenu', e => e.preventDefault());
   } else {
     bindPress(b);
-    b.onclick = () => sendKey(key);
+    b.onclick = () => sendKey(key, 'SHORT', b);
   }
 });
 
 document.querySelectorAll('[data-link]').forEach(b => {
   bindPress(b);
-  b.onclick = () => post('/api/app', {link: b.dataset.link});
+  b.onclick = () => post('/api/app', {link: b.dataset.link}, b);
 });
+
+// Power gets its own hold-to-confirm gesture rather than the data-hold
+// mechanism above: a quick accidental tap must not toggle power, but the
+// key we eventually send is a single ordinary SHORT press, not a
+// START_LONG/END_LONG pair (see the CSS comment on #power .ring for why).
+{
+  const POWER_HOLD_MS = 600;
+  const powerBtn = document.getElementById('power');
+  const ring = powerBtn.querySelector('.ring circle');
+  const RING_CIRC = 2 * Math.PI * 26;
+  ring.style.strokeDasharray = RING_CIRC;
+  ring.style.strokeDashoffset = RING_CIRC;
+
+  let down = false;
+  let fired = false;
+  let timer = null;
+
+  const resetRing = (ms) => {
+    ring.style.transitionDuration = ms + 'ms';
+    ring.style.strokeDashoffset = RING_CIRC;
+  };
+
+  powerBtn.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    if (down) return;
+    powerBtn.setPointerCapture(e.pointerId);
+    down = true;
+    fired = false;
+    ring.style.transitionDuration = POWER_HOLD_MS + 'ms';
+    requestAnimationFrame(() => { ring.style.strokeDashoffset = 0; });
+    timer = setTimeout(() => {
+      fired = true;
+      powerBtn.classList.add('confirmed');
+      setTimeout(() => powerBtn.classList.remove('confirmed'), 200);
+      resetRing(150);
+      sendKey('POWER', 'SHORT', powerBtn);
+    }, POWER_HOLD_MS);
+  });
+  const release = () => {
+    if (!down) return;
+    down = false;
+    clearTimeout(timer);
+    if (!fired) resetRing(150);
+  };
+  powerBtn.addEventListener('pointerup', release);
+  powerBtn.addEventListener('pointercancel', release);
+  powerBtn.addEventListener('contextmenu', e => e.preventDefault());
+}
 
 const sendBtn = document.getElementById('send');
 bindPress(sendBtn);
