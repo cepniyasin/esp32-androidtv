@@ -24,9 +24,8 @@
     background: linear-gradient(180deg, #15191f 0%, #0c0f13 100%);
     color: #e8eaed;
     min-height: 100vh; min-height: 100dvh;
-    display: flex; justify-content: center; align-items: center;
-    padding: max(env(safe-area-inset-top), 12px) 16px
-             max(env(safe-area-inset-bottom), 16px);
+    display: flex; justify-content: center; align-items: flex-start;
+    padding: 0 16px max(env(safe-area-inset-bottom), 16px);
   }
   #remote {
     width: 100%; max-width: 340px;
@@ -50,8 +49,15 @@
   }
   button svg .fill { fill: currentColor; stroke: none; }
 
-  /* top bar */
-  #topbar { display: flex; align-items: center; justify-content: space-between; }
+  /* top bar: pinned to the top so link/power state stays visible even if
+     the page ever grows tall enough to scroll */
+  #topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 10;
+    background: #15191f;
+    padding-top: max(env(safe-area-inset-top), 12px);
+    margin-top: calc(-1 * max(env(safe-area-inset-top), 12px));
+  }
   #statusdot {
     width: 10px; height: 10px; border-radius: 50%;
     background: #f28b82; display: inline-block; margin-right: 8px;
@@ -115,13 +121,17 @@
   #d-down  { bottom: 0; left: 25%; width: 50%; height: 33%; }
   #d-left  { left: 0;   top: 25%;  width: 33%; height: 50%; }
   #d-right { right: 0;  top: 25%;  width: 33%; height: 50%; }
-  #d-ok {
+  /* "#dpad #d-ok" (not just "#d-ok") to out-specificity the "#dpad button"
+     rule above — both are one ID selector, but "#dpad button" also matches
+     the type selector "button", so a bare "#d-ok" here used to lose and the
+     OK button rendered as a square despite the border-radius below. */
+  #dpad #d-ok {
     top: 50%; left: 50%; transform: translate(-50%, -50%);
     width: 96px; height: 96px; border-radius: 50%;
     background: #2c3540; font-weight: 600; letter-spacing: 0.06em;
     box-shadow: 0 2px 8px rgba(0,0,0,0.45);
   }
-  #d-ok:active { background: #3a4652; transform: translate(-50%, -50%) scale(0.96); }
+  #dpad #d-ok:active { background: #3a4652; transform: translate(-50%, -50%) scale(0.96); }
 
   /* rows */
   .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
