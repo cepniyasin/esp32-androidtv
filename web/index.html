@@ -115,7 +115,11 @@
     position: absolute; background: transparent; border-radius: 0;
     color: #bdc1c6; display: flex; align-items: center; justify-content: center;
   }
-  #dpad button:active { background: rgba(255,255,255,0.07); transform: none; }
+  /* Wedge presses can't scale-down like other buttons (a pie slice looks
+     broken shrinking off-center), so the tint has to carry the whole
+     feedback signal alone — 0.07 read as barely-there next to every other
+     button's solid bg swap; 0.16 is the smallest bump that's unambiguous. */
+  #dpad button:active { background: rgba(255,255,255,0.16); transform: none; }
   #dpad button svg { width: 26px; height: 26px; stroke-width: 2.2; }
   #d-up    { top: 0;    left: 25%; width: 50%; height: 33%; }
   #d-down  { bottom: 0; left: 25%; width: 50%; height: 33%; }
