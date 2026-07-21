@@ -1,3 +1,10 @@
+## [0.2.3](https://github.com/cepniyasin/esp32-androidtv/compare/v0.2.2...v0.2.3) (2026-07-21)
+
+
+### Bug Fixes
+
+* prevent pinch/double-tap zoom and text selection page-wide ([#9](https://github.com/cepniyasin/esp32-androidtv/issues/9)) ([adcd408](https://github.com/cepniyasin/esp32-androidtv/commit/adcd40823ccde1d9daf3eb60e7d6e977050d256d))
+
 ## [0.2.2](https://github.com/cepniyasin/esp32-androidtv/compare/v0.2.1...v0.2.2) (2026-07-21)
 
 
