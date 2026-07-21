@@ -57,7 +57,9 @@
     -webkit-tap-highlight-color: transparent;
     transition: background 0.12s, transform 0.06s;
   }
-  button:active { background: #313b47; transform: scale(0.96); }
+  /* .pressed is the JS-driven equivalent of :active for plain-click
+     buttons — see the bindPress() comment in the script below. */
+  button:active, button.pressed { background: #313b47; transform: scale(0.96); }
   button.nosupport { opacity: 0.3; pointer-events: none; }
   button svg {
     width: 22px; height: 22px; display: block; margin: 0 auto;
@@ -85,13 +87,13 @@
     color: #f28b82; background: #2a2229;
     display: flex; align-items: center; justify-content: center;
   }
-  #power:active { background: #3d2e35; }
+  #power:active, #power.pressed { background: #3d2e35; }
   #logsbtn {
     width: 40px; height: 40px; border-radius: 50%; margin-right: 8px;
     color: #9aa0a6; background: #1b2129;
     display: flex; align-items: center; justify-content: center;
   }
-  #logsbtn:active { background: #262e38; }
+  #logsbtn:active, #logsbtn.pressed { background: #262e38; }
   #logsbtn svg { width: 18px; height: 18px; }
 
   /* log viewer */
@@ -164,7 +166,7 @@
     background: #2c3540; font-weight: 600; letter-spacing: 0.06em;
     box-shadow: 0 2px 8px rgba(0,0,0,0.45);
   }
-  #dpad #d-ok:active { background: #3a4652; transform: translate(-50%, -50%) scale(0.96); }
+  #dpad #d-ok:active, #dpad #d-ok.pressed { background: #3a4652; transform: translate(-50%, -50%) scale(0.96); }
 
   /* rows */
   .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
@@ -177,9 +179,9 @@
   #apps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
   #apps button { height: 52px; font-weight: 700; font-size: 0.95rem; letter-spacing: 0.02em; }
   #app-netflix { background: #2a1a1c; color: #e50914; }
-  #app-netflix:active { background: #3c2225; }
+  #app-netflix:active, #app-netflix.pressed { background: #3c2225; }
   #app-youtube { background: #2a1e1c; color: #ff4e45; }
-  #app-youtube:active { background: #3c2a26; }
+  #app-youtube:active, #app-youtube.pressed { background: #3c2a26; }
 
   /* pairing */
   #pair {
@@ -290,6 +292,28 @@ const fwversion = document.getElementById('fwversion');
 let pairing = false;
 let holding = false;
 
+// Buttons that only have an onclick handler (no pointerdown of their own)
+// fire touchstart -> click in one native cycle now that the tap delay is
+// gone (touch-action: manipulation + user-scalable=no, above): fast enough
+// that some browsers skip painting the transient native :active state
+// entirely. Drive a plain .pressed class instead, held for a minimum
+// visible duration, decoupled from that timing.
+const PRESS_MIN_MS = 90;
+function bindPress(el) {
+  let timer;
+  el.addEventListener('pointerdown', () => {
+    clearTimeout(timer);
+    el.classList.add('pressed');
+  });
+  const release = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => el.classList.remove('pressed'), PRESS_MIN_MS);
+  };
+  el.addEventListener('pointerup', release);
+  el.addEventListener('pointercancel', release);
+  el.addEventListener('pointerleave', release);
+}
+
 // All key sends go through one promise chain: parallel fetches can arrive
 // out of order, and a release overtaking its press breaks the key.
 let keyChain = Promise.resolve();
@@ -371,15 +395,19 @@ document.querySelectorAll('[data-key]').forEach(b => {
     b.addEventListener('pointercancel', release);
     b.addEventListener('contextmenu', e => e.preventDefault());
   } else {
+    bindPress(b);
     b.onclick = () => sendKey(key);
   }
 });
 
 document.querySelectorAll('[data-link]').forEach(b => {
+  bindPress(b);
   b.onclick = () => post('/api/app', {link: b.dataset.link});
 });
 
-document.getElementById('send').onclick = async () => {
+const sendBtn = document.getElementById('send');
+bindPress(sendBtn);
+sendBtn.onclick = async () => {
   const code = document.getElementById('code').value.trim().toUpperCase();
   if (!/^[0-9A-F]{6}$/.test(code)) {
     msgEl.textContent = 'code must be 6 hex characters';
@@ -432,7 +460,11 @@ async function pollLogs() {
   logPollTimer = setTimeout(pollLogs, 1000);
 }
 
-document.getElementById('logsbtn').onclick = () => {
+const logsBtn = document.getElementById('logsbtn');
+const logCloseBtn = document.getElementById('logclose');
+bindPress(logsBtn);
+bindPress(logCloseBtn);
+logsBtn.onclick = () => {
   logsOpen = true;
   logPanel.classList.add('visible');
   logText.textContent = '';
@@ -440,7 +472,7 @@ document.getElementById('logsbtn').onclick = () => {
   clearTimeout(logPollTimer);
   pollLogs();
 };
-document.getElementById('logclose').onclick = () => {
+logCloseBtn.onclick = () => {
   logsOpen = false;
   logPanel.classList.remove('visible');
   clearTimeout(logPollTimer);
