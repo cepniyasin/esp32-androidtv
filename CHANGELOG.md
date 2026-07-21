@@ -1,3 +1,10 @@
+# [0.3.0](https://github.com/cepniyasin/esp32-androidtv/compare/v0.2.3...v0.3.0) (2026-07-21)
+
+
+### Features
+
+* add sending/failed dispatch feedback and power hold-to-confirm ([#7](https://github.com/cepniyasin/esp32-androidtv/issues/7)) ([16abbc8](https://github.com/cepniyasin/esp32-androidtv/commit/16abbc8ea44a389d293d065cbdf229ab5ecbe324))
+
 ## [0.2.3](https://github.com/cepniyasin/esp32-androidtv/compare/v0.2.2...v0.2.3) (2026-07-21)
 
 

@@ -6,4 +6,4 @@
 //
 // Auto-bumped by semantic-release (tools/bump_version.sh via
 // .releaserc.json) on every push to main — don't hand-edit this.
-#define FW_VERSION "0.2.3"
+#define FW_VERSION "0.3.0"
