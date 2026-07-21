@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#101418">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" href="/icon-192.png">
@@ -14,12 +14,18 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { color-scheme: dark; }
-  body {
+  html, body {
     /* the whole remote is chrome, not content: nothing selectable, no
-       long-press callouts anywhere (e.g. status text next to buttons) */
+       long-press callouts anywhere (e.g. status text next to buttons), and
+       no pinch/double-tap zoom — the viewport meta tag above blocks the
+       browser-chrome pinch gesture, this blocks the double-tap-to-zoom
+       gesture recognizer that meta tag alone doesn't cover everywhere. */
+    touch-action: manipulation;
     user-select: none; -webkit-user-select: none;
     -webkit-touch-callout: none;
     -webkit-tap-highlight-color: transparent;
+  }
+  body {
     font-family: system-ui, -apple-system, sans-serif;
     background: linear-gradient(180deg, #15191f 0%, #0c0f13 100%);
     color: #e8eaed;
