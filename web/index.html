@@ -24,12 +24,20 @@
     background: linear-gradient(180deg, #15191f 0%, #0c0f13 100%);
     color: #e8eaed;
     min-height: 100vh; min-height: 100dvh;
-    display: flex; justify-content: center; align-items: flex-start;
+    display: flex; justify-content: center;
     padding: 0 16px max(env(safe-area-inset-bottom), 16px);
   }
   #remote {
     width: 100%; max-width: 340px;
     display: flex; flex-direction: column; gap: 18px;
+  }
+  /* Only the header is pinned near the top; the d-pad/rows/apps/footer are
+     the controls actually tapped over and over, so they get pushed down
+     into the reachable lower two-thirds instead of sitting right under the
+     header with a dead zone below (see PR review on #4). */
+  #controls {
+    display: flex; flex-direction: column; gap: 18px;
+    margin-top: auto;
   }
   button {
     font: inherit; color: inherit; border: none; cursor: pointer;
@@ -202,52 +210,54 @@
     <p id="pairmsg"></p>
   </div>
 
-  <div id="dpad">
-    <button id="d-up" data-key="DPAD_UP" data-hold aria-label="Up">
-      <svg viewBox="0 0 24 24"><polyline points="6 14 12 8 18 14"/></svg>
-    </button>
-    <button id="d-left" data-key="DPAD_LEFT" data-hold aria-label="Left">
-      <svg viewBox="0 0 24 24"><polyline points="14 6 8 12 14 18"/></svg>
-    </button>
-    <button id="d-ok" data-key="DPAD_CENTER" aria-label="OK">OK</button>
-    <button id="d-right" data-key="DPAD_RIGHT" data-hold aria-label="Right">
-      <svg viewBox="0 0 24 24"><polyline points="10 6 16 12 10 18"/></svg>
-    </button>
-    <button id="d-down" data-key="DPAD_DOWN" data-hold aria-label="Down">
-      <svg viewBox="0 0 24 24"><polyline points="6 10 12 16 18 10"/></svg>
-    </button>
-  </div>
+  <div id="controls">
+    <div id="dpad">
+      <button id="d-up" data-key="DPAD_UP" data-hold aria-label="Up">
+        <svg viewBox="0 0 24 24"><polyline points="6 14 12 8 18 14"/></svg>
+      </button>
+      <button id="d-left" data-key="DPAD_LEFT" data-hold aria-label="Left">
+        <svg viewBox="0 0 24 24"><polyline points="14 6 8 12 14 18"/></svg>
+      </button>
+      <button id="d-ok" data-key="DPAD_CENTER" aria-label="OK">OK</button>
+      <button id="d-right" data-key="DPAD_RIGHT" data-hold aria-label="Right">
+        <svg viewBox="0 0 24 24"><polyline points="10 6 16 12 10 18"/></svg>
+      </button>
+      <button id="d-down" data-key="DPAD_DOWN" data-hold aria-label="Down">
+        <svg viewBox="0 0 24 24"><polyline points="6 10 12 16 18 10"/></svg>
+      </button>
+    </div>
 
-  <div class="row">
-    <button data-key="BACK" aria-label="Back">
-      <svg viewBox="0 0 24 24"><path d="M19 12H5"/><polyline points="11 6 5 12 11 18"/></svg>
-    </button>
-    <button data-key="HOME" aria-label="Home">
-      <svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>
-    </button>
-    <button data-key="MEDIA_PLAY_PAUSE" aria-label="Play/Pause">
-      <svg viewBox="0 0 24 24"><path class="fill" d="M5 5.5v13l9-6.5z"/><path d="M17.5 5.5v13"/><path d="M21 5.5v13"/></svg>
-    </button>
-  </div>
+    <div class="row">
+      <button data-key="BACK" aria-label="Back">
+        <svg viewBox="0 0 24 24"><path d="M19 12H5"/><polyline points="11 6 5 12 11 18"/></svg>
+      </button>
+      <button data-key="HOME" aria-label="Home">
+        <svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>
+      </button>
+      <button data-key="MEDIA_PLAY_PAUSE" aria-label="Play/Pause">
+        <svg viewBox="0 0 24 24"><path class="fill" d="M5 5.5v13l9-6.5z"/><path d="M17.5 5.5v13"/><path d="M21 5.5v13"/></svg>
+      </button>
+    </div>
 
-  <div class="row">
-    <button data-key="VOLUME_DOWN" data-hold data-vol aria-label="Volume down">
-      <svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg>
-    </button>
-    <button data-key="VOLUME_MUTE" data-vol aria-label="Mute">
-      <svg viewBox="0 0 24 24"><path class="fill" d="M4 9v6h4l5 4V5L8 9z"/><path d="m16.5 9.5 5 5"/><path d="m21.5 9.5-5 5"/></svg>
-    </button>
-    <button data-key="VOLUME_UP" data-hold data-vol aria-label="Volume up">
-      <svg viewBox="0 0 24 24"><path d="M6 12h12"/><path d="M12 6v12"/></svg>
-    </button>
-  </div>
+    <div class="row">
+      <button data-key="VOLUME_DOWN" data-hold data-vol aria-label="Volume down">
+        <svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg>
+      </button>
+      <button data-key="VOLUME_MUTE" data-vol aria-label="Mute">
+        <svg viewBox="0 0 24 24"><path class="fill" d="M4 9v6h4l5 4V5L8 9z"/><path d="m16.5 9.5 5 5"/><path d="m21.5 9.5-5 5"/></svg>
+      </button>
+      <button data-key="VOLUME_UP" data-hold data-vol aria-label="Volume up">
+        <svg viewBox="0 0 24 24"><path d="M6 12h12"/><path d="M12 6v12"/></svg>
+      </button>
+    </div>
 
-  <div id="apps">
-    <button id="app-netflix" data-link="netflix://home">NETFLIX</button>
-    <button id="app-youtube" data-link="https://www.youtube.com/tv">YouTube</button>
-  </div>
+    <div id="apps">
+      <button id="app-netflix" data-link="netflix://home">NETFLIX</button>
+      <button id="app-youtube" data-link="https://www.youtube.com/tv">YouTube</button>
+    </div>
 
-  <div id="footer">v<span id="fwversion">…</span></div>
+    <div id="footer">v<span id="fwversion">…</span></div>
+  </div>
 </div>
 
 <script>
