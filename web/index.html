@@ -25,7 +25,7 @@
     color: #e8eaed;
     min-height: 100vh; min-height: 100dvh;
     display: flex; justify-content: center;
-    padding: max(env(safe-area-inset-top), 12px) 16px
+    padding: max(env(safe-area-inset-top), 24px) 16px
              max(env(safe-area-inset-bottom), 16px);
   }
   #remote {
@@ -124,11 +124,25 @@
     position: absolute; background: transparent; border-radius: 0;
     color: #bdc1c6; display: flex; align-items: center; justify-content: center;
   }
+  #dpad button:active { transform: none; }
   /* Wedge presses can't scale-down like other buttons (a pie slice looks
      broken shrinking off-center), so the tint has to carry the whole
      feedback signal alone — 0.07 read as barely-there next to every other
-     button's solid bg swap; 0.16 is the smallest bump that's unambiguous. */
-  #dpad button:active { background: rgba(255,255,255,0.16); transform: none; }
+     button's solid bg swap; 0.16 is the smallest bump that's unambiguous.
+     The highlight is a separate ::after (not the button's own background)
+     because the hit-rectangle is deliberately bigger than the wedge the
+     d-pad visually implies — a plain rectangular fill reads as a fat cross
+     with square corners poking past the circle, not a pie slice. Clipping
+     just the highlight to a trapezoid tapering toward the center matches
+     the button's apparent shape without shrinking the tap target. */
+  #dpad button::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+  }
+  #dpad button:active::after { background: rgba(255,255,255,0.16); }
+  #d-up::after    { clip-path: polygon(15% 0%, 85% 0%, 65% 100%, 35% 100%); }
+  #d-down::after  { clip-path: polygon(35% 0%, 65% 0%, 85% 100%, 15% 100%); }
+  #d-left::after  { clip-path: polygon(0% 15%, 0% 85%, 100% 65%, 100% 35%); }
+  #d-right::after { clip-path: polygon(100% 15%, 100% 85%, 0% 65%, 0% 35%); }
   #dpad button svg { width: 26px; height: 26px; stroke-width: 2.2; }
   #d-up    { top: 0;    left: 25%; width: 50%; height: 33%; }
   #d-down  { bottom: 0; left: 25%; width: 50%; height: 33%; }
