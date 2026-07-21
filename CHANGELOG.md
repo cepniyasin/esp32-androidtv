@@ -1,3 +1,11 @@
+## [0.2.2](https://github.com/cepniyasin/esp32-androidtv/compare/v0.2.1...v0.2.2) (2026-07-21)
+
+
+### Bug Fixes
+
+* clip d-pad press highlight to a wedge and add header breathing room ([#8](https://github.com/cepniyasin/esp32-androidtv/issues/8)) ([0c5a045](https://github.com/cepniyasin/esp32-androidtv/commit/0c5a045fbd474c82c4381a8ebea448737b0fcb45))
+* pin header to top and make OK button actually round ([#4](https://github.com/cepniyasin/esp32-androidtv/issues/4)) ([54cf521](https://github.com/cepniyasin/esp32-androidtv/commit/54cf52150210ee457b400a0921136b67dbaf530c)), closes [#dpad](https://github.com/cepniyasin/esp32-androidtv/issues/dpad) [#5](https://github.com/cepniyasin/esp32-androidtv/issues/5) [#6](https://github.com/cepniyasin/esp32-androidtv/issues/6) [#controls](https://github.com/cepniyasin/esp32-androidtv/issues/controls) [body/#topbar](https://github.com/cepniyasin/esp32-androidtv/issues/topbar) [#controls](https://github.com/cepniyasin/esp32-androidtv/issues/controls)
+
 ## [0.2.1](https://github.com/cepniyasin/esp32-androidtv/compare/v0.2.0...v0.2.1) (2026-07-21)
 
 
