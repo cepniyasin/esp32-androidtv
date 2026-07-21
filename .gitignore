@@ -8,3 +8,4 @@ certs/*.pem
 certs/*.key
 build/
 node_modules/
+plan/
