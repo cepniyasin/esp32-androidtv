@@ -73,14 +73,15 @@ static esp_err_t png_handler(httpd_req_t *req)
 
 static esp_err_t status_get_handler(httpd_req_t *req)
 {
-    char body[220];
+    char body[256];
     int len = snprintf(body, sizeof(body),
-                       "{\"paired\":%s,\"connected\":%s,\"state\":\"%s\","
+                       "{\"paired\":%s,\"connected\":%s,\"state\":\"%s\",\"power\":\"%s\","
                        "\"volume\":{\"level\":%d,\"max\":%d,\"muted\":%s},"
                        "\"samsung\":{\"connected\":%s},\"version\":\"" FW_VERSION "\"}",
                        g_atv_status.paired ? "true" : "false",
                        g_atv_status.connected ? "true" : "false",
                        atv_state_str(g_atv_status.state),
+                       atv_power_str(g_atv_status.power),
                        g_atv_status.vol_level, g_atv_status.vol_max,
                        g_atv_status.vol_muted ? "true" : "false",
                        g_samsung_status.connected ? "true" : "false");

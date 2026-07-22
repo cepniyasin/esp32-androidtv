@@ -100,6 +100,13 @@
     display: flex; align-items: center; justify-content: center;
   }
   #power:active { background: #3d2e35; }
+  /* TV power state (from remote_start), independent of link state above
+     and of the transient .pressed/.confirmed interaction classes below —
+     unknown (not paired/reconnecting) keeps the original red icon. Blue,
+     not the .confirmed ring's green, so a hold-in-progress on an
+     already-on TV doesn't read as "confirmed" before it actually is. */
+  #power.on { color: #8ab4f8; }
+  #power.off { color: #5f6368; }
   /* Hold-to-confirm ring: a quick tap must not toggle power (accidental
      taps near the top corner), so the confirm gesture is a plain JS
      timer/pointer hold, not the data-hold START_LONG/END_LONG mechanism
@@ -319,6 +326,7 @@
 <script>
 const statusText = document.getElementById('statustext');
 const statusDot = document.getElementById('statusdot');
+const powerBtn = document.getElementById('power');
 const pairEl = document.getElementById('pair');
 const msgEl = document.getElementById('pairmsg');
 const fwversion = document.getElementById('fwversion');
@@ -410,6 +418,11 @@ async function poll() {
       : s.state === 'wait_code' ? 'pairing'
       : s.state.replace('_', ' ');
     pairEl.classList.toggle('visible', s.state === 'wait_code');
+    // TV power state is a separate signal from link state above — it can
+    // read "connected" + power "unknown" right after a reconnect, or
+    // "off" while the control channel is still up (CEC standby).
+    powerBtn.classList.toggle('on', s.power === 'on');
+    powerBtn.classList.toggle('off', s.power === 'off');
     if (s.version) fwversion.textContent = s.version;
     // max == 0: the Chromecast delegates volume to the TV over CEC and
     // can't change it itself — but the firmware falls back to talking to
@@ -475,7 +488,6 @@ document.querySelectorAll('[data-link]').forEach(b => {
 // START_LONG/END_LONG pair (see the CSS comment on #power .ring for why).
 {
   const POWER_HOLD_MS = 600;
-  const powerBtn = document.getElementById('power');
   const ring = powerBtn.querySelector('.ring circle');
   const RING_CIRC = 2 * Math.PI * 26;
   ring.style.strokeDasharray = RING_CIRC;

@@ -14,6 +14,7 @@ void app_state_init(void)
     g_key_queue = xQueueCreate(8, sizeof(key_cmd_t));
     g_app_queue = xQueueCreate(2, APP_LINK_MAX);
     g_atv_status.state = ATV_STATE_BOOT;
+    g_atv_status.power = ATV_POWER_UNKNOWN;
 }
 
 const char *atv_state_str(atv_state_t s)
@@ -25,6 +26,16 @@ const char *atv_state_str(atv_state_t s)
     case ATV_STATE_PAIR_FAILED: return "pair_failed";
     case ATV_STATE_PAIRED: return "paired";
     case ATV_STATE_CONNECTED: return "connected";
+    }
+    return "unknown";
+}
+
+const char *atv_power_str(atv_power_t p)
+{
+    switch (p) {
+    case ATV_POWER_ON: return "on";
+    case ATV_POWER_OFF: return "off";
+    case ATV_POWER_UNKNOWN: return "unknown";
     }
     return "unknown";
 }

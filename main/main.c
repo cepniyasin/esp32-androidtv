@@ -105,6 +105,9 @@ static void tv_session_task(void *arg)
         }
         g_atv_status.connected = false;
         g_atv_status.state = ATV_STATE_PAIRED;
+        // Power state came from the last session's remote_start; it's stale
+        // until the new session gets its own.
+        g_atv_status.power = ATV_POWER_UNKNOWN;
         ESP_LOGW(TAG, "Control channel down; reconnecting in %u ms", (unsigned)backoff_ms);
         vTaskDelay(pdMS_TO_TICKS(backoff_ms));
         // Cap low enough that recovery after a WiFi/TV outage never feels
