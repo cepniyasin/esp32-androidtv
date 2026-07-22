@@ -1,3 +1,10 @@
+# [0.4.0](https://github.com/cepniyasin/esp32-androidtv/compare/v0.3.0...v0.4.0) (2026-07-22)
+
+
+### Features
+
+* show TV power state in header ([#10](https://github.com/cepniyasin/esp32-androidtv/issues/10)) ([143871e](https://github.com/cepniyasin/esp32-androidtv/commit/143871ea7b2f3b477684d5ffe8dfc2673c698821)), closes [#power](https://github.com/cepniyasin/esp32-androidtv/issues/power)
+
 # [0.3.0](https://github.com/cepniyasin/esp32-androidtv/compare/v0.2.3...v0.3.0) (2026-07-21)
 
 
