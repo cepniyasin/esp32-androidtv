@@ -98,18 +98,21 @@
   #power {
     position: relative;
     width: 52px; height: 52px; border-radius: 50%;
-    color: #f28b82; background: #2a2229;
+    color: #f2a600; background: #2a2229;
     display: flex; align-items: center; justify-content: center;
   }
   #power:active { background: #3d2e35; }
   /* TV power state (from remote_start), independent of link state above
      and of the transient .pressed interaction class below — unknown
-     (not paired/reconnecting) keeps the original muted red icon. on/off
-     use saturated green/red vs. the muted default so the state reads at
-     a glance. The hold-ring below tracks this via currentColor rather
-     than getting its own confirm color — a ring that flips to green on
-     completion regardless of context read as "turning on" even while
-     holding to turn an already-on TV off.
+     (not paired/reconnecting) is a solid amber, the same hue .pending
+     pulses with below but static: neither the red of "off" nor the
+     green of "on", and its stillness (vs. pending's animation) reads as
+     "no signal yet" rather than "waiting on a command". on/off use
+     saturated green/red so the state reads at a glance. The hold-ring
+     below tracks this via currentColor rather than getting its own
+     confirm color — a ring that flips to green on completion regardless
+     of context read as "turning on" even while holding to turn an
+     already-on TV off.
      Off is warmer/lighter than a pure red (#ff5c4d, not #ff3b30) because
      the button's own background is a dark maroon (#2a2229) — a pure red
      icon sinks into that tint (~4.3:1 contrast) more than the muted
@@ -119,9 +122,10 @@
   /* Pending: shown for a couple seconds right after a confirmed press,
      since the real on/off color would otherwise just sit stale until the
      TV's next remote_start tells us what actually happened. Overrides
-     .on/.off (JS removes those classes while pending is set) with a
-     pulsing neutral amber rather than reusing green/red, so it can't be
-     mistaken for an actual state that hasn't happened yet. */
+     .on/.off (JS removes those classes while pending is set) with the
+     same amber as the unknown state, but pulsing — so it can't be
+     mistaken for an actual on/off, while the animation distinguishes
+     "actively waiting on this command" from plain "no signal yet". */
   #power.pending { color: #f2a600; }
   #power.pending svg:last-of-type { animation: power-pending-pulse 0.9s ease-in-out infinite; }
   @keyframes power-pending-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
