@@ -103,10 +103,13 @@
   }
   #power:active { background: #3d2e35; }
   /* TV power state (from remote_start), independent of link state above
-     and of the transient .pressed/.confirmed interaction classes below —
-     unknown (not paired/reconnecting) keeps the original muted red icon.
-     on/off use saturated green/red (vs. the muted default and the
-     .confirmed ring's softer green) so the state reads at a glance.
+     and of the transient .pressed interaction class below — unknown
+     (not paired/reconnecting) keeps the original muted red icon. on/off
+     use saturated green/red vs. the muted default so the state reads at
+     a glance. The hold-ring below tracks this via currentColor rather
+     than getting its own confirm color — a ring that flips to green on
+     completion regardless of context read as "turning on" even while
+     holding to turn an already-on TV off.
      Off is warmer/lighter than a pure red (#ff5c4d, not #ff3b30) because
      the button's own background is a dark maroon (#2a2229) — a pure red
      icon sinks into that tint (~4.3:1 contrast) more than the muted
@@ -141,7 +144,6 @@
     transition-property: stroke-dashoffset;
     transition-timing-function: linear;
   }
-  #power.confirmed .ring circle { stroke: #81c995; }
   #logsbtn {
     width: 40px; height: 40px; border-radius: 50%; margin-right: 8px;
     color: #9aa0a6; background: #1b2129;
@@ -536,8 +538,6 @@ document.querySelectorAll('[data-link]').forEach(b => {
     requestAnimationFrame(() => { ring.style.strokeDashoffset = 0; });
     timer = setTimeout(() => {
       fired = true;
-      powerBtn.classList.add('confirmed');
-      setTimeout(() => powerBtn.classList.remove('confirmed'), 200);
       resetRing(150);
       sendKey('POWER', 'SHORT', powerBtn);
       // The TV won't report its new state instantly, so show a pending
