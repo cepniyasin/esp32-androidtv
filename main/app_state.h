@@ -18,10 +18,19 @@ typedef enum {
     ATV_STATE_CONNECTED,    // control channel live
 } atv_state_t;
 
+// From remote_start.started. Tri-state so the UI can distinguish "not
+// known yet" (just booted/reconnected) from a confirmed off.
+typedef enum {
+    ATV_POWER_UNKNOWN,
+    ATV_POWER_ON,
+    ATV_POWER_OFF,
+} atv_power_t;
+
 typedef struct {
     volatile bool paired;
     volatile bool connected;
     volatile atv_state_t state;
+    volatile atv_power_t power;
     // From remote_set_volume_level. max == 0 means the device delegates
     // volume to the TV over CEC and the protocol cannot change it.
     volatile int vol_level;
@@ -64,3 +73,4 @@ extern QueueHandle_t g_app_queue;  // item: char[APP_LINK_MAX]
 void app_state_init(void);
 
 const char *atv_state_str(atv_state_t s);
+const char *atv_power_str(atv_power_t p);

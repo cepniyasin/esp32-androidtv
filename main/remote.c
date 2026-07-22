@@ -146,8 +146,12 @@ static bool handle_msg(const remote_RemoteMessage *in, remote_RemoteMessage *out
         return true;
     }
     if (in->has_remote_start) {
-        ESP_LOGI(TAG, "remote_start (device is %s) — control channel ready",
+        // Not handshake-only: the reference (remote.py) updates is_on on
+        // every remote_start, so the TV can push this again later if its
+        // power state changes while the control channel stays up.
+        ESP_LOGI(TAG, "remote_start (device is %s)",
                  in->remote_start.started ? "on" : "off");
+        g_atv_status.power = in->remote_start.started ? ATV_POWER_ON : ATV_POWER_OFF;
         g_atv_status.connected = true;
         g_atv_status.state = ATV_STATE_CONNECTED;
         return false;
