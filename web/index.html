@@ -31,8 +31,10 @@
     color: #e8eaed;
     min-height: 100vh; min-height: 100dvh;
     display: flex; justify-content: center;
-    padding: max(env(safe-area-inset-top), 24px) 16px
-             max(env(safe-area-inset-bottom), 16px);
+    padding: 0 16px max(env(safe-area-inset-bottom), 16px);
+    /* header sat right under the notch/status-bar with no breathing
+       room; push it down with extra top padding on top of the inset. */
+    padding-top: calc(max(env(safe-area-inset-top), 24px) + 2.5rem);
   }
   #remote {
     width: 100%; max-width: 340px;
@@ -102,11 +104,15 @@
   #power:active { background: #3d2e35; }
   /* TV power state (from remote_start), independent of link state above
      and of the transient .pressed/.confirmed interaction classes below —
-     unknown (not paired/reconnecting) keeps the original red icon. Blue,
-     not the .confirmed ring's green, so a hold-in-progress on an
-     already-on TV doesn't read as "confirmed" before it actually is. */
-  #power.on { color: #8ab4f8; }
-  #power.off { color: #5f6368; }
+     unknown (not paired/reconnecting) keeps the original muted red icon.
+     on/off use saturated green/red (vs. the muted default and the
+     .confirmed ring's softer green) so the state reads at a glance.
+     Off is warmer/lighter than a pure red (#ff5c4d, not #ff3b30) because
+     the button's own background is a dark maroon (#2a2229) — a pure red
+     icon sinks into that tint (~4.3:1 contrast) more than the muted
+     default did; this shade holds ~5:1. */
+  #power.on { color: #34c759; }
+  #power.off { color: #ff5c4d; }
   /* Hold-to-confirm ring: a quick tap must not toggle power (accidental
      taps near the top corner), so the confirm gesture is a plain JS
      timer/pointer hold, not the data-hold START_LONG/END_LONG mechanism
