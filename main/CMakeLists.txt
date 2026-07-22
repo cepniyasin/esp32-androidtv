@@ -8,10 +8,12 @@ idf_component_register(
          "logbuf.c"
          "pairing.c"
          "store.c"
+         "shortcuts.c"
          "remote.c"
          "samsung_tv.c"
          "proto_gen/polo.pb.c"
          "proto_gen/remotemessage.pb.c"
+         "proto_gen/appshortcuts.pb.c"
     INCLUDE_DIRS "." "proto_gen"
     PRIV_REQUIRES nvs_flash esp_wifi nanopb mbedtls esp_http_server json esp_websocket_client
     EMBED_TXTFILES "../certs/client.pem" "../certs/client.key" "../web/index.html"

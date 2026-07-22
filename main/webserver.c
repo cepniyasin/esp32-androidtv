@@ -6,12 +6,14 @@
 #include <string.h>
 
 #include "app_state.h"
+#include "cJSON.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "logbuf.h"
 #include "mdns.h"
 #include "remote.h"
 #include "samsung_tv.h"
+#include "shortcuts.h"
 #include "version.h"
 
 static const char *TAG = "webserver";
@@ -251,6 +253,122 @@ static esp_err_t app_post_handler(httpd_req_t *req)
     return httpd_resp_sendstr(req, "{\"ok\":true}");
 }
 
+// GET /api/shortcuts -> {"items":[{"label":"..","app_id":".."},...]}. The
+// web UI renders one launch button per entry; app_id is the same deep-link
+// a button then POSTs back to /api/app. Falls back to built-in defaults
+// until the user saves their own list (see shortcuts.c).
+static esp_err_t shortcuts_get_handler(httpd_req_t *req)
+{
+    AppShortcuts sc;
+    shortcuts_load(&sc);
+
+    cJSON *root = cJSON_CreateObject();
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "out of memory");
+        return ESP_FAIL;
+    }
+    cJSON *items = cJSON_AddArrayToObject(root, "items");
+    for (pb_size_t i = 0; items != NULL && i < sc.items_count; i++) {
+        cJSON *o = cJSON_CreateObject();
+        if (o == NULL) {
+            break;
+        }
+        cJSON_AddStringToObject(o, "label", sc.items[i].label);
+        cJSON_AddStringToObject(o, "app_id", sc.items[i].app_id);
+        cJSON_AddItemToArray(items, o);
+    }
+
+    char *out = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (out == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "out of memory");
+        return ESP_FAIL;
+    }
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t err = httpd_resp_sendstr(req, out);
+    cJSON_free(out);
+    return err;
+}
+
+// POST /api/shortcuts with {"items":[{"label":"..","app_id":".."},...]}:
+// validates count and per-entry lengths, then persists the list to NVS.
+// Rejects malformed/oversized bodies so a bad config can't reach flash.
+static esp_err_t shortcuts_post_handler(httpd_req_t *req)
+{
+    // Bound the body: SHORTCUTS_MAX entries of label(32)+app_id(128) plus
+    // JSON overhead fit well under this; anything larger is malformed.
+    if (req->content_len == 0 || req->content_len > 4096) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "bad body size");
+        return ESP_FAIL;
+    }
+    char *body = malloc(req->content_len + 1);
+    if (body == NULL) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "out of memory");
+        return ESP_FAIL;
+    }
+    int received = 0;
+    while (received < (int)req->content_len) {
+        int r = httpd_req_recv(req, body + received, req->content_len - received);
+        if (r <= 0) {
+            free(body);
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "recv failed");
+            return ESP_FAIL;
+        }
+        received += r;
+    }
+    body[received] = '\0';
+
+    cJSON *root = cJSON_Parse(body);
+    free(body);
+    if (root == NULL) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "invalid JSON");
+        return ESP_FAIL;
+    }
+    cJSON *items = cJSON_GetObjectItem(root, "items");
+    if (!cJSON_IsArray(items)) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "missing items array");
+        return ESP_FAIL;
+    }
+    int n = cJSON_GetArraySize(items);
+    if (n > SHORTCUTS_MAX) {
+        cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "too many shortcuts");
+        return ESP_FAIL;
+    }
+
+    AppShortcuts sc = AppShortcuts_init_zero;
+    for (int i = 0; i < n; i++) {
+        cJSON *it = cJSON_GetArrayItem(items, i);
+        cJSON *label = cJSON_GetObjectItem(it, "label");
+        cJSON *app_id = cJSON_GetObjectItem(it, "app_id");
+        if (!cJSON_IsString(label) || !cJSON_IsString(app_id) ||
+            label->valuestring[0] == '\0' || app_id->valuestring[0] == '\0' ||
+            strlen(label->valuestring) >= sizeof(sc.items[i].label) ||
+            strlen(app_id->valuestring) >= sizeof(sc.items[i].app_id)) {
+            cJSON_Delete(root);
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "invalid shortcut entry");
+            return ESP_FAIL;
+        }
+        strlcpy(sc.items[i].label, label->valuestring, sizeof(sc.items[i].label));
+        strlcpy(sc.items[i].app_id, app_id->valuestring, sizeof(sc.items[i].app_id));
+        sc.items_count++;
+    }
+    cJSON_Delete(root);
+
+    esp_err_t err = shortcuts_save(&sc);
+    if (err == ESP_ERR_INVALID_ARG) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "invalid shortcut list");
+        return ESP_FAIL;
+    }
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "save failed");
+        return ESP_FAIL;
+    }
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_sendstr(req, "{\"ok\":true}");
+}
+
 // Returns firmware log lines newer than ?after=<offset> as JSON:
 // {"next":<offset to poll from next>,"dropped":<bool, ring wrapped past
 // what the client had>,"text":"<escaped log text>"}. Poll with `after`
@@ -334,8 +452,11 @@ esp_err_t webserver_start(void)
     // Phones hold several keep-alive connections; without LRU purge the
     // server starts refusing new requests, which looks like dropouts.
     config.lru_purge_enable = true;
-    // Default is 8; we register 10 (page, manifest, 3 icons, 5 API).
-    config.max_uri_handlers = 12;
+    // Default is 8; we register 12 (page, manifest, 3 icons, 7 API).
+    config.max_uri_handlers = 14;
+    // The shortcuts handlers put an AppShortcuts struct (~1.6 KB) and a
+    // serialize buffer on the stack; the 4 KB default is too tight for that.
+    config.stack_size = 8192;
     httpd_handle_t server = NULL;
     esp_err_t err = httpd_start(&server, &config);
     if (err != ESP_OK) {
@@ -357,6 +478,12 @@ esp_err_t webserver_start(void)
     };
     static const httpd_uri_t app_uri = {
         .uri = "/api/app", .method = HTTP_POST, .handler = app_post_handler
+    };
+    static const httpd_uri_t shortcuts_get_uri = {
+        .uri = "/api/shortcuts", .method = HTTP_GET, .handler = shortcuts_get_handler
+    };
+    static const httpd_uri_t shortcuts_post_uri = {
+        .uri = "/api/shortcuts", .method = HTTP_POST, .handler = shortcuts_post_handler
     };
     static const httpd_uri_t logs_uri = {
         .uri = "/api/logs", .method = HTTP_GET, .handler = logs_get_handler
@@ -382,6 +509,8 @@ esp_err_t webserver_start(void)
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &pair_uri));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &key_uri));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &app_uri));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &shortcuts_get_uri));
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server, &shortcuts_post_uri));
     ESP_ERROR_CHECK(httpd_register_uri_handler(server, &logs_uri));
 
     ESP_LOGI(TAG, "Web UI at http://androidtv-remote.local/ (port 80)");
