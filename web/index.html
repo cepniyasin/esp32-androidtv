@@ -113,6 +113,15 @@
      default did; this shade holds ~5:1. */
   #power.on { color: #34c759; }
   #power.off { color: #ff5c4d; }
+  /* Pending: shown for a couple seconds right after a confirmed press,
+     since the real on/off color would otherwise just sit stale until the
+     TV's next remote_start tells us what actually happened. Overrides
+     .on/.off (JS removes those classes while pending is set) with a
+     pulsing neutral amber rather than reusing green/red, so it can't be
+     mistaken for an actual state that hasn't happened yet. */
+  #power.pending { color: #f2a600; }
+  #power.pending svg:last-of-type { animation: power-pending-pulse 0.9s ease-in-out infinite; }
+  @keyframes power-pending-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
   /* Hold-to-confirm ring: a quick tap must not toggle power (accidental
      taps near the top corner), so the confirm gesture is a plain JS
      timer/pointer hold, not the data-hold START_LONG/END_LONG mechanism
@@ -338,6 +347,11 @@ const msgEl = document.getElementById('pairmsg');
 const fwversion = document.getElementById('fwversion');
 let pairing = false;
 let holding = false;
+// Set to a timestamp while the power icon is showing its post-press
+// pending animation; poll() leaves .on/.off alone until it passes, so a
+// stale color doesn't flash back on between the press and that timestamp.
+let powerPendingUntil = 0;
+const POWER_PENDING_MS = 2500;
 
 // Buttons that only have an onclick handler (no pointerdown of their own)
 // fire touchstart -> click in one native cycle now that the tap delay is
@@ -426,9 +440,13 @@ async function poll() {
     pairEl.classList.toggle('visible', s.state === 'wait_code');
     // TV power state is a separate signal from link state above — it can
     // read "connected" + power "unknown" right after a reconnect, or
-    // "off" while the control channel is still up (CEC standby).
-    powerBtn.classList.toggle('on', s.power === 'on');
-    powerBtn.classList.toggle('off', s.power === 'off');
+    // "off" while the control channel is still up (CEC standby). Skipped
+    // while the pending animation is showing so an in-flight status
+    // that hasn't caught up with the press doesn't flash the old color.
+    if (Date.now() >= powerPendingUntil) {
+      powerBtn.classList.toggle('on', s.power === 'on');
+      powerBtn.classList.toggle('off', s.power === 'off');
+    }
     if (s.version) fwversion.textContent = s.version;
     // max == 0: the Chromecast delegates volume to the TV over CEC and
     // can't change it itself — but the firmware falls back to talking to
@@ -522,6 +540,16 @@ document.querySelectorAll('[data-link]').forEach(b => {
       setTimeout(() => powerBtn.classList.remove('confirmed'), 200);
       resetRing(150);
       sendKey('POWER', 'SHORT', powerBtn);
+      // The TV won't report its new state instantly, so show a pending
+      // pulse instead of leaving the old (now possibly wrong) on/off
+      // color up until the next poll happens to catch the change.
+      powerBtn.classList.remove('on', 'off');
+      powerBtn.classList.add('pending');
+      powerPendingUntil = Date.now() + POWER_PENDING_MS;
+      setTimeout(() => {
+        powerBtn.classList.remove('pending');
+        poll();
+      }, POWER_PENDING_MS);
     }, POWER_HOLD_MS);
   });
   const release = () => {
