@@ -241,9 +241,16 @@
   #apps:empty { display: none; }  /* removing all shortcuts hides the row */
   #apps button {
     height: 52px; font-weight: 700; font-size: 0.95rem; letter-spacing: 0.02em;
-    background: #232a33; color: #cdd3da;
+    /* --btncolor/--btntext are set inline per-button by renderApps() below
+       (guessed brand color or a user pick from the editor); the var()
+       fallback is the original flat styling for buttons with no color. */
+    background: var(--btncolor, #232a33); color: var(--btntext, #cdd3da);
     padding: 0 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  /* Higher specificity than the global "button:active, button.pressed"
+     rule above (which would otherwise flatten a colored button to grey on
+     press) — darken the button's own color instead of replacing it. */
+  #apps button:active, #apps button.pressed { filter: brightness(0.82); }
   #editapps {
     align-self: center; background: none; color: #6b7480;
     font-size: 0.72rem; letter-spacing: 0.03em; padding: 4px 10px;
@@ -273,6 +280,7 @@
     background: #1b2129; border-radius: 12px; padding: 10px;
   }
   .editrow .fields { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .editrow .fields > .textrow { display: flex; gap: 6px; }
   .editrow input {
     font: inherit; font-size: 0.9rem; width: 100%;
     background: #10151b; color: #e8eaed;
@@ -280,6 +288,12 @@
     user-select: text; -webkit-user-select: text;
   }
   .editrow input::placeholder { color: #5a626c; }
+  /* Color swatch: the native color input's own chrome (border/padding) reads
+     inconsistently across browsers, so it's shrunk to a bare square swatch
+     and the row's usual input border/background carries the framing instead. */
+  .editrow input[type="color"] {
+    flex: 0 0 auto; width: 40px; padding: 3px;
+  }
   .editrow .rowbtns { display: flex; flex-direction: column; gap: 6px; }
   .editrow .rowbtns button {
     width: 34px; height: 100%; min-height: 30px; border-radius: 8px;
@@ -580,11 +594,77 @@ const APPID_MAX = 127;  // must match sizeof(AppShortcut.app_id) - 1
 const appsEl = document.getElementById('apps');
 let shortcuts = [];
 
+// Per-shortcut button colors are a browser-side display preference, not
+// firmware config: they never touch /api/shortcuts or NVS, just a
+// localStorage map keyed by app_id (the stable identity of an entry).
+const COLOR_STORE_KEY = 'shortcutColors';
+function loadColorMap() {
+  try {
+    return JSON.parse(localStorage.getItem(COLOR_STORE_KEY)) || {};
+  } catch (e) {
+    return {};
+  }
+}
+function saveColorMap(map) {
+  try {
+    localStorage.setItem(COLOR_STORE_KEY, JSON.stringify(map));
+  } catch (e) { /* storage unavailable/full — colors just won't persist */ }
+}
+
+// Best-effort brand color for well-known apps, matched against the link
+// (more stable than the user-editable label) and falling back to the
+// label. Anything unrecognized gets no color: the button keeps the plain
+// default styling rather than a guessed, possibly-wrong color.
+const BRAND_COLORS = [
+  ['netflix', '#e50914'],
+  ['youtube', '#ff0000'],
+  ['spotify', '#1db954'],
+  ['disneyplus', '#113ccf'],
+  ['disney', '#113ccf'],
+  ['hulu', '#1ce783'],
+  ['primevideo', '#00a8e1'],
+  ['amazon', '#00a8e1'],
+  ['plex', '#e5a00d'],
+  ['twitch', '#9146ff'],
+  ['hbomax', '#8b2fc9'],
+  ['hbo', '#8b2fc9'],
+  ['jellyfin', '#00a4dc'],
+  ['appletv', '#000000'],
+];
+function guessColor(s) {
+  const hay = ((s.app_id || '') + ' ' + (s.label || '')).toLowerCase();
+  for (const [needle, color] of BRAND_COLORS) {
+    if (hay.includes(needle)) return color;
+  }
+  return null;
+}
+function colorFor(s, map) {
+  return (map[s.app_id] || guessColor(s) || '').trim();
+}
+
+// Picks readable button text (near-black vs near-white) against a hex
+// background using perceived brightness, not full WCAG contrast — good
+// enough for a flat single-color button label.
+function textFor(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return '';
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness > 140 ? '#10151b' : '#ffffff';
+}
+
 function renderApps() {
   appsEl.innerHTML = '';
+  const colors = loadColorMap();
   for (const s of shortcuts) {
     const b = document.createElement('button');
     b.textContent = s.label;
+    const color = colorFor(s, colors);
+    if (color) {
+      b.style.setProperty('--btncolor', color);
+      b.style.setProperty('--btntext', textFor(color));
+    }
     bindPress(b);
     b.onclick = () => post('/api/app', {link: s.app_id}, b);
     appsEl.appendChild(b);
@@ -750,17 +830,25 @@ function renderEditor() {
 
     const fields = document.createElement('div');
     fields.className = 'fields';
+    const textrow = document.createElement('div');
+    textrow.className = 'textrow';
+    const color = document.createElement('input');
+    color.type = 'color';
+    color.title = 'Button color';
+    color.value = /^#[0-9a-f]{6}$/i.test(item.color) ? item.color : (guessColor(item) || '#232a33');
+    color.oninput = () => { draft[i].color = color.value; };
     const label = document.createElement('input');
     label.placeholder = 'Label';
     label.maxLength = LABEL_MAX;
     label.value = item.label;
     label.oninput = () => { draft[i].label = label.value; };
+    textrow.append(color, label);
     const appId = document.createElement('input');
     appId.placeholder = 'Deep link (e.g. netflix://home)';
     appId.maxLength = APPID_MAX;
     appId.value = item.app_id;
     appId.oninput = () => { draft[i].app_id = appId.value; };
-    fields.append(label, appId);
+    fields.append(textrow, appId);
 
     const btns = document.createElement('div');
     btns.className = 'rowbtns';
@@ -801,8 +889,11 @@ bindPress(editSave);
 bindPress(editClose);
 
 editApps.onclick = () => {
-  // Deep-copy the live list so cancel (close) discards edits.
-  draft = shortcuts.map(s => ({label: s.label, app_id: s.app_id}));
+  // Deep-copy the live list so cancel (close) discards edits. Colors aren't
+  // part of the server-side shortcut record, so seed each draft entry's
+  // color from the local map (falling back to a brand guess) here.
+  const colors = loadColorMap();
+  draft = shortcuts.map(s => ({label: s.label, app_id: s.app_id, color: colorFor(s, colors)}));
   editMsg.textContent = '';
   renderEditor();
   editPanel.classList.add('visible');
@@ -810,7 +901,7 @@ editApps.onclick = () => {
 editClose.onclick = () => editPanel.classList.remove('visible');
 editAdd.onclick = () => {
   if (draft.length >= SHORTCUTS_MAX) return;
-  draft.push({label: '', app_id: ''});
+  draft.push({label: '', app_id: '', color: ''});
   renderEditor();
 };
 editSave.onclick = async () => {
@@ -834,6 +925,11 @@ editSave.onclick = async () => {
     editMsg.textContent = 'request failed';
     return;
   }
+  // Rebuild the color map from scratch (keyed by the now-current app_ids)
+  // so removed/renamed entries don't leave stale colors behind.
+  const colors = {};
+  draft.forEach((s, i) => { colors[items[i].app_id] = s.color || ''; });
+  saveColorMap(colors);
   shortcuts = items;
   renderApps();
   editPanel.classList.remove('visible');
