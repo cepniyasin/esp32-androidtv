@@ -1,0 +1,13 @@
+// App shortcut row config, persisted in NVS as a single serialized blob
+// (see main/shortcuts.c). app_id is the launch deep-link / intent the
+// firmware hands to RemoteAppLinkLaunchRequest.
+syntax = "proto3";
+
+message AppShortcut {
+  string label = 1;
+  string app_id = 2;
+}
+
+message AppShortcuts {
+  repeated AppShortcut items = 1;
+}

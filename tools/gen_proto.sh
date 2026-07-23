@@ -8,6 +8,6 @@ cd "$(dirname "$0")/.."
 GEN="${NANOPB_GENERATOR:-nanopb_generator}"
 OUT=main/proto_gen
 mkdir -p "$OUT"
-"$GEN" --proto-path=proto --output-dir="$OUT" polo.proto remotemessage.proto
+"$GEN" --proto-path=proto --output-dir="$OUT" polo.proto remotemessage.proto appshortcuts.proto
 echo "Generated:"
 ls -la "$OUT"

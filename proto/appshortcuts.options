@@ -1,0 +1,6 @@
+# nanopb sizing for the app shortcut config (appshortcuts.proto). Static
+# allocation: label/app_id become fixed char arrays, items a fixed array +
+# count. max_count caps the row per the issue's flash-budget guard.
+AppShortcut.label   max_size:32
+AppShortcut.app_id  max_size:128
+AppShortcuts.items  max_count:10
