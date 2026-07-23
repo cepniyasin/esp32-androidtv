@@ -1,3 +1,10 @@
+# [0.5.0](https://github.com/cepniyasin/esp32-androidtv/compare/v0.4.0...v0.5.0) (2026-07-23)
+
+
+### Features
+
+* make the app shortcut row configurable ([#11](https://github.com/cepniyasin/esp32-androidtv/issues/11)) ([01f3eb0](https://github.com/cepniyasin/esp32-androidtv/commit/01f3eb002c7cb4e142683fdb6716f43930d0b7a4))
+
 # [0.4.0](https://github.com/cepniyasin/esp32-androidtv/compare/v0.3.0...v0.4.0) (2026-07-22)
 
 
