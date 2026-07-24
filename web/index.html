@@ -235,6 +235,15 @@
     display: flex; align-items: center; justify-content: center;
   }
 
+  /* close-app buttons: same two-up grid as the app shortcut row, a touch
+     shorter and quieter so they read as a utility, not a primary control. */
+  #closeblock { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .closebtn {
+    height: 48px; background: #232a33; color: #b3b9c0;
+    font-size: 0.88rem; font-weight: 600; letter-spacing: 0.02em;
+    padding: 0 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
   /* app shortcuts (row is data-driven; see loadShortcuts() below) */
   #appsblock { display: flex; flex-direction: column; gap: 10px; }
   #apps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
@@ -413,6 +422,23 @@
       </button>
     </div>
 
+    <!-- Close-app controls. The Android TV Remote v2 protocol exposes no
+         force-stop/kill primitive: the only app command a RemoteMessage
+         carries is RemoteAppLinkLaunchRequest (launch a deep link — see
+         proto/remotemessage.proto), and there's no way to enumerate or stop
+         background apps over this connection (that needs ADB). So the most
+         these buttons can do is press KEYCODE_HOME — the foreground app is
+         backgrounded and the launcher shown; Android then reclaims memory
+         from idle apps on its own. Both therefore resolve to the same HOME
+         key; they're kept as two entries to match the on-remote mental
+         model, and each asks for confirmation so a stray tap doesn't yank
+         the TV back to the launcher mid-show. Same honesty as the volume
+         note in CLAUDE.md — the UI copy never claims a force-stop. -->
+    <div id="closeblock">
+      <button id="close-app" class="closebtn">Close app</button>
+      <button id="close-all" class="closebtn">Close all apps</button>
+    </div>
+
     <div id="appsblock">
       <div id="apps"></div>
       <button id="editapps">Edit shortcuts</button>
@@ -584,6 +610,26 @@ document.querySelectorAll('[data-key]:not(#power)').forEach(b => {
     b.onclick = () => sendKey(key, 'SHORT', b);
   }
 });
+
+// Close-app buttons. Both send KEYCODE_HOME — the only "leave the app" lever
+// this protocol has; it can't force-stop apps, so the foreground app is
+// backgrounded and the OS frees idle ones itself (see the #closeblock markup
+// comment). A confirm() gates each so a stray tap can't drop the TV to the
+// launcher mid-show.
+function bindClose(id, prompt) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  bindPress(el);
+  el.onclick = () => {
+    if (!window.confirm(prompt)) return;
+    sendKey('HOME', 'SHORT', el);
+  };
+}
+bindClose('close-app',
+  'Close the current app and return to the Home screen?');
+bindClose('close-all',
+  'Return to the Home screen?\n\nNote: this remote can\'t force-stop apps, ' +
+  'so background apps stay in memory and Android frees them as needed.');
 
 // App shortcut row: data-driven from /api/shortcuts (persisted in NVS on
 // the device), rendered here as launch buttons. An empty list leaves #apps
